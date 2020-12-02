@@ -4,6 +4,8 @@
 #include <set>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
+#include <vector>
 
 
 ////////////////////////////
@@ -107,6 +109,124 @@ void RunReportRepair()
 
 
 ////////////////////////////
+// Problem 2 - Password Philosophy
+
+void InitTestPasswordLines(std::vector<std::string>& lines)
+{
+	lines.clear();
+	lines.push_back("1-3 a: abcde");
+	lines.push_back("1-3 b: cdefg");
+	lines.push_back("2-9 c: ccccccccc");
+}
+
+void ReadPasswordLines(const char* fileName, std::vector<std::string>& lines)
+{
+	lines.clear();
+
+	FILE* pFile = fopen(fileName, "rt");
+	assert(pFile);
+
+	char string[1024];
+	while ((fgets(string, sizeof(string), pFile) != nullptr) && !feof(pFile))
+	{
+		lines.push_back(string);
+	}
+
+	fclose(pFile);
+}
+
+void ParseNumber(const char*& pString, char untilChar, BigInt& number)
+{
+	char temp[64];
+	char* pOutTemp = temp;
+	while (*pString != untilChar)
+	{
+		assert(*pString >= '0');
+		assert(*pString <= '9');
+
+		*pOutTemp++ = *pString++;
+	}
+	*pOutTemp = 0;
+
+	assert(*pString == untilChar);
+	++pString;
+
+	number = atoi(temp);
+}
+
+void ParsePasswordLine(const char* line, BigInt& min, BigInt& max, char& ch, std::string& password)
+{
+	ParseNumber(line, '-', min);
+	ParseNumber(line, ' ', max);
+	ch = *line++;
+	assert(*line == ':');
+	++line;
+	assert(*line == ' ');
+	++line;
+
+	password.clear();
+	while ((*line != '\n') && (*line != 0))
+	{
+		password.push_back(*line);
+		++line;
+	}
+}
+
+BigInt CountValidPasswords(const std::vector<std::string>& lines)
+{
+	BigInt numValidPasswords = 0;
+
+	std::string password;
+	for (auto iter = lines.begin(); iter != lines.end(); ++iter)
+	{
+		printf("Parsing password line:  %s\n", iter->c_str());
+
+		BigInt min;
+		BigInt max;
+		char ch;
+		ParsePasswordLine(iter->c_str(), min, max, ch, password);
+
+		printf("  min = %lld, max = %lld, ch = %c, password = '%s'\n", min, max, ch, password.c_str());
+
+		BigInt numCh = 0;
+		for (BigInt i = 0; i < (BigInt)password.length(); ++i)
+		{
+			if (password[i] == ch)
+			{
+				++numCh;
+				if (numCh > max)
+					break;
+			}
+		}
+
+		if ((numCh >= min) && (numCh <= max))
+		{
+			++numValidPasswords;
+			printf("  Password VALID!\n");
+		}
+		else
+		{
+			printf("  Password invalid\n");
+		}
+	}
+
+	return numValidPasswords;
+}
+
+void RunPasswordPhilosophy()
+{
+	std::vector<std::string> passwordLines1;
+	InitTestPasswordLines(passwordLines1);
+	printf("Num valid test passwords = %lld\n", CountValidPasswords(passwordLines1));
+
+	std::vector<std::string> passwordLines2;
+	ReadPasswordLines("Day2Input.txt", passwordLines2);
+	printf("Num valid test passwords = %lld\n", CountValidPasswords(passwordLines2));
+}
+
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -127,6 +247,9 @@ int main(int argc, char** argv)
 	{
 	case 1:
 		RunReportRepair();
+		break;
+	case 2:
+		RunPasswordPhilosophy();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
