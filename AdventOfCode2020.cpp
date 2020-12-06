@@ -14,6 +14,25 @@
 
 typedef long long BigInt;
 
+void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
+{
+	lines.clear();
+
+	FILE* pFile = fopen(fileName, "rt");
+	assert(pFile);
+
+	char string[1024];
+	while ((fgets(string, sizeof(string), pFile) != nullptr) && !feof(pFile))
+	{
+		const BigInt len = strlen(string);
+		if ((len > 1) && (string[len - 1] == '\n'))
+			string[len - 1] = 0;
+		lines.push_back(string);
+	}
+
+	fclose(pFile);
+}
+
 
 ////////////////////////////
 ////////////////////////////
@@ -117,22 +136,6 @@ void InitTestPasswordLines(std::vector<std::string>& lines)
 	lines.push_back("1-3 a: abcde");
 	lines.push_back("1-3 b: cdefg");
 	lines.push_back("2-9 c: ccccccccc");
-}
-
-void ReadPasswordLines(const char* fileName, std::vector<std::string>& lines)
-{
-	lines.clear();
-
-	FILE* pFile = fopen(fileName, "rt");
-	assert(pFile);
-
-	char string[1024];
-	while ((fgets(string, sizeof(string), pFile) != nullptr) && !feof(pFile))
-	{
-		lines.push_back(string);
-	}
-
-	fclose(pFile);
 }
 
 void ParseNumber(const char*& pString, char untilChar, BigInt& number)
@@ -249,9 +252,96 @@ void RunPasswordPhilosophy()
 	printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines1, true, true));
 
 	std::vector<std::string> passwordLines2;
-	ReadPasswordLines("Day2Input.txt", passwordLines2);
+	ReadFileLines("Day2Input.txt", passwordLines2);
 	printf("Num valid test passwords (first scheme) = %lld\n", CountValidPasswords(passwordLines2, false, false));
 	printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines2, true, false));
+}
+
+
+////////////////////////////
+// Problem 3 - Toboggan Trajectory
+
+void InitTobogTrajTestData(std::vector<std::string>& data)
+{
+	data.clear();
+	data.push_back("..##.......");
+	data.push_back("#...#...#..");
+	data.push_back(".#....#..#.");
+	data.push_back("..#.#...#.#");
+	data.push_back(".#...##..#.");
+	data.push_back("..#.##.....");
+	data.push_back(".#.#.#....#");
+	data.push_back(".#........#");
+	data.push_back("#.##...#...");
+	data.push_back("#...##....#");
+	data.push_back(".#..#...#.#");
+}
+
+BigInt CountTobogTrajTrees(const std::vector<std::string>& data, BigInt rightStep, BigInt downStep, bool verbose)
+{
+	BigInt numTrees = 0;
+
+	const BigInt lineSize = data[0].length();
+
+	BigInt xPos = 0;
+	BigInt yPos = 0;
+
+	while (yPos < (BigInt)data.size())
+	{
+		assert((BigInt)data[yPos].length() == lineSize);
+
+		const bool hitTree = (data[yPos][xPos] == '#');
+		if (hitTree)
+			++numTrees;
+
+		if (verbose)
+		{
+			static std::string lineCopy;
+			lineCopy = data[yPos];
+			lineCopy[xPos] = hitTree ? 'X' : 'O';
+			printf("%s\n", lineCopy.c_str());
+		}
+
+		xPos = (xPos + rightStep) % lineSize;
+		yPos += downStep;
+	}
+
+	return numTrees;
+}
+
+void IterateProdNumTreesDifferentSlopes(const std::vector<std::string>& data, BigInt rightStep, BigInt downStep, BigInt& prod)
+{
+	const BigInt count = CountTobogTrajTrees(data, rightStep, downStep, false);
+	printf("Num trees with slope (%lld,%lld) = %lld\n", rightStep, downStep, count);
+	prod *= count;
+}
+
+void CalcProdNumTreesDifferentSlopes(const std::vector<std::string>& data)
+{
+	BigInt prod = 1;
+
+	IterateProdNumTreesDifferentSlopes(data, 1, 1, prod);
+	IterateProdNumTreesDifferentSlopes(data, 3, 1, prod);
+	IterateProdNumTreesDifferentSlopes(data, 5, 1, prod);
+	IterateProdNumTreesDifferentSlopes(data, 7, 1, prod);
+	IterateProdNumTreesDifferentSlopes(data, 1, 2, prod);
+	printf("Grand product = %lld\n", prod);
+}
+
+void RunTobogganTrajectory()
+{
+	const BigInt rightStep = 3;
+	const BigInt downStep = 1;
+
+	std::vector<std::string> testData;
+	InitTobogTrajTestData(testData);
+	printf("Num trees encountered in test data with slope (%lld,%lld) = %lld\n", rightStep, downStep, CountTobogTrajTrees(testData, rightStep, downStep, true));
+	CalcProdNumTreesDifferentSlopes(testData);
+
+	std::vector<std::string> fileData;
+	ReadFileLines("Day3Input.txt", fileData);
+	printf("Num trees encountered in file data with slope (%lld,%lld) = %lld\n", rightStep, downStep, CountTobogTrajTrees(fileData, rightStep, downStep, false));
+	CalcProdNumTreesDifferentSlopes(fileData);
 }
 
 
@@ -280,6 +370,9 @@ int main(int argc, char** argv)
 		break;
 	case 2:
 		RunPasswordPhilosophy();
+		break;
+	case 3:
+		RunTobogganTrajectory();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
