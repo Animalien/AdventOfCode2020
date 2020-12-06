@@ -401,17 +401,99 @@ void PassportEntry::ReadField(const char* fieldName, const char* fieldValue, boo
 		printf("Read field '%s' = '%s'\n", fieldName, fieldValue);
 }
 
+bool StringHasDigits(const std::string& st, BigInt start = 0, BigInt end = -1)
+{
+	if (end <= 0)
+		end = st.length() - 1;
+
+	for (BigInt i = start; i <= end; ++i)
+	{
+		const char ch = st[i];
+		if (ch < '0')
+			return false;
+		if (ch > '9')
+			return false;
+	}
+
+	return true;
+}
+
+bool StringHasLowerCaseAlphaNumeric(const std::string& st, BigInt start = 0, BigInt end = -1)
+{
+	if (end <= 0)
+		end = st.length() - 1;
+
+	for (BigInt i = start; i <= end; ++i)
+	{
+		const char ch = st[i];
+		if ((ch >= '0') && (ch <= '9'))
+			continue;
+		if ((ch >= 'a') && (ch <= 'z'))
+			continue;
+		return false;
+	}
+
+	return true;
+}
+
+bool StringIsIntWithinRange(const std::string& st, BigInt min, BigInt max, BigInt skipLastChars = 0)
+{
+	if (st.empty())
+		return false;
+	if (!StringHasDigits(st, 0, st.length() - skipLastChars - 1))
+		return false;
+
+	const BigInt value = atoi(st.c_str());
+	return ((value >= min) && (value <= max));
+}
+
+bool StringIsIntWithinRangeAndSuffix(const std::string& st, BigInt min, BigInt max, const char* suffix, BigInt suffixLen)
+{
+	if ((BigInt)st.length() <= suffixLen)
+		return false;
+	if (st.compare(st.length() - suffixLen, suffixLen, suffix) != 0)
+		return false;
+
+	return StringIsIntWithinRange(st, min, max, suffixLen);
+}
+
 bool PassportEntry::IsValid() const
 {
-	// ignore cid emptiness
-	return (
-		!byr.empty() &&
-		!iyr.empty() &&
-		!eyr.empty() &&
-		!hgt.empty() &&
-		!hcl.empty() &&
-		!ecl.empty() &&
-		!pid.empty());
+	if (!StringIsIntWithinRange(byr, 1920, 2002))
+		return false;
+
+	if (!StringIsIntWithinRange(iyr, 2010, 2020))
+		return false;
+
+	if (!StringIsIntWithinRange(eyr, 2020, 2030))
+		return false;
+
+	if (!StringIsIntWithinRangeAndSuffix(hgt, 150, 193, "cm", 2) &&
+		!StringIsIntWithinRangeAndSuffix(hgt, 59, 76, "in", 2))
+		return false;
+
+	if ((hcl.length() != 7) ||
+		(hcl[0] != '#') ||
+		!StringHasLowerCaseAlphaNumeric(hcl, 1))
+		return false;
+
+	if (ecl.empty() ||
+		((ecl != "amb") &&
+			(ecl != "blu") &&
+			(ecl != "brn") &&
+			(ecl != "gry") &&
+			(ecl != "grn") &&
+			(ecl != "hzl") &&
+			(ecl != "oth")))
+		return false;
+
+	if ((pid.length() != 9) ||
+		!StringHasDigits(pid))
+		return false;
+
+	// ignore cid presence and contents
+
+	return true;
 }
 
 void ReadPassportFile(const char* fileName, std::vector<PassportEntry>& data, bool verbose)
@@ -502,6 +584,11 @@ void RunPassportProcessing()
 	std::vector<PassportEntry> testData;
 	ReadPassportFile("Input\\Day4TestInput.txt", testData, true);
 	printf("Num valid passports in test data = %lld\n", CountValidPassports(testData));
+
+	std::vector<PassportEntry> invalidData;
+	ReadPassportFile("Input\\Day4InvalidInput.txt", invalidData, true);
+	std::vector<PassportEntry> validData;
+	ReadPassportFile("Input\\Day4ValidInput.txt", validData, true);
 
 	std::vector<PassportEntry> data;
 	ReadPassportFile("Input\\Day4Input.txt", data, false);
