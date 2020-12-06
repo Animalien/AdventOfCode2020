@@ -1,6 +1,7 @@
 // Hi, this is my AdventOfCode 2020 stuff
 
 #include <assert.h>
+#include <map>
 #include <set>
 #include <stdio.h>
 #include <stdlib.h>
@@ -121,7 +122,7 @@ void RunReportRepair()
 	FindReportRepairThreeNums(set1);
 
 	std::set<BigInt> set2;
-	ReadReportRepairInput("Day1Input.txt", set2);
+	ReadReportRepairInput("Input\\Day1Input.txt", set2);
 	FindReportRepairTwoNums(set2);
 	FindReportRepairThreeNums(set2);
 }
@@ -252,7 +253,7 @@ void RunPasswordPhilosophy()
 	printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines1, true, true));
 
 	std::vector<std::string> passwordLines2;
-	ReadFileLines("Day2Input.txt", passwordLines2);
+	ReadFileLines("Input\\Day2Input.txt", passwordLines2);
 	printf("Num valid test passwords (first scheme) = %lld\n", CountValidPasswords(passwordLines2, false, false));
 	printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines2, true, false));
 }
@@ -339,9 +340,172 @@ void RunTobogganTrajectory()
 	CalcProdNumTreesDifferentSlopes(testData);
 
 	std::vector<std::string> fileData;
-	ReadFileLines("Day3Input.txt", fileData);
+	ReadFileLines("Input\\Day3Input.txt", fileData);
 	printf("Num trees encountered in file data with slope (%lld,%lld) = %lld\n", rightStep, downStep, CountTobogTrajTrees(fileData, rightStep, downStep, false));
 	CalcProdNumTreesDifferentSlopes(fileData);
+}
+
+
+////////////////////////////
+// Problem 4 - Passport Processing
+
+struct PassportEntry
+{
+	std::string byr;
+	std::string iyr;
+	std::string eyr;
+	std::string hgt;
+	std::string hcl;
+	std::string ecl;
+	std::string pid;
+	std::string cid;
+
+	void ReadField(const char* fieldName, const char* fieldValue, bool verbose);
+
+	bool IsValid() const;
+
+private:
+	struct Comp
+	{
+		bool operator()(const char* a, const char* b) const
+		{
+			return (strcmp(a, b) < 0);
+		}
+	};
+
+	typedef std::string PassportEntry::* FieldPtr;
+	static const std::map<const char*, FieldPtr, Comp> s_fieldMap;
+};
+
+const std::map<const char*, PassportEntry::FieldPtr, PassportEntry::Comp> PassportEntry::s_fieldMap =
+{
+	{ "byr", &PassportEntry::byr },
+	{ "iyr", &PassportEntry::iyr },
+	{ "eyr", &PassportEntry::eyr },
+	{ "hgt", &PassportEntry::hgt },
+	{ "hcl", &PassportEntry::hcl },
+	{ "ecl", &PassportEntry::ecl },
+	{ "pid", &PassportEntry::pid },
+	{ "cid", &PassportEntry::cid },
+};
+
+void PassportEntry::ReadField(const char* fieldName, const char* fieldValue, bool verbose)
+{
+	auto iter = s_fieldMap.find(fieldName);
+	assert(iter != s_fieldMap.end());
+
+	auto pMember = iter->second;
+	this->*pMember = fieldValue;
+
+	if (verbose)
+		printf("Read field '%s' = '%s'\n", fieldName, fieldValue);
+}
+
+bool PassportEntry::IsValid() const
+{
+	// ignore cid emptiness
+	return (
+		!byr.empty() &&
+		!iyr.empty() &&
+		!eyr.empty() &&
+		!hgt.empty() &&
+		!hcl.empty() &&
+		!ecl.empty() &&
+		!pid.empty());
+}
+
+void ReadPassportFile(const char* fileName, std::vector<PassportEntry>& data, bool verbose)
+{
+	FILE* pFile = fopen(fileName, "rt");
+	assert(pFile);
+
+	PassportEntry* pEntry = nullptr;
+	std::string fieldName;
+	std::string fieldValue;
+	std::string* pStringReading = &fieldName;
+
+	int ch = 0;
+	int chPrev = 0;
+	for (;;)
+	{
+		ch = fgetc(pFile);
+		if ((ch == '\n') || (ch == ' ') || (ch == EOF))
+		{
+			if (!fieldValue.empty())
+			{
+				assert(!fieldName.empty());
+				assert(pEntry != nullptr);
+
+				pEntry->ReadField(fieldName.c_str(), fieldValue.c_str(), verbose);
+				fieldName.clear();
+				fieldValue.clear();
+				pStringReading = &fieldName;
+			}
+
+			if ((ch == '\n') && (chPrev == '\n'))
+			{
+				if (verbose && pEntry)
+					printf("Entry is %s\n", pEntry->IsValid() ? "VALID" : "INVALID");
+
+				pEntry = nullptr;
+			}
+			else if (ch == EOF)
+				break;
+		}
+		else if (ch == ':')
+		{
+			assert(!fieldName.empty());
+			assert(fieldValue.empty());
+
+			pStringReading = &fieldValue;
+		}
+		else
+		{
+			if (pEntry == nullptr)
+			{
+				assert(fieldName.empty());
+				assert(fieldValue.empty());
+				assert(pStringReading == &fieldName);
+
+				data.push_back(PassportEntry());
+				pEntry = &(data.back());
+
+				if (verbose)
+					printf("\nNew passport entry started\n");
+			}
+
+			pStringReading->push_back((char)ch);
+		}
+
+		chPrev = ch;
+	}
+
+	if (verbose && pEntry)
+		printf("Entry is %s\n", pEntry->IsValid() ? "VALID" : "INVALID");
+}
+
+BigInt CountValidPassports(const std::vector<PassportEntry>& data)
+{
+	BigInt count = 0;
+
+	for (BigInt i = 0; i < (BigInt)data.size(); ++i)
+	{
+		if (data[i].IsValid())
+			++count;
+	}
+
+	return count;
+}
+
+void RunPassportProcessing()
+{
+	std::vector<PassportEntry> testData;
+	ReadPassportFile("Input\\Day4TestInput.txt", testData, true);
+	printf("Num valid passports in test data = %lld\n", CountValidPassports(testData));
+
+	std::vector<PassportEntry> data;
+	ReadPassportFile("Input\\Day4Input.txt", data, false);
+	printf("Num valid passports in data = %lld\n", CountValidPassports(data));
 }
 
 
@@ -373,6 +537,9 @@ int main(int argc, char** argv)
 		break;
 	case 3:
 		RunTobogganTrajectory();
+		break;
+	case 4:
+		RunPassportProcessing();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
