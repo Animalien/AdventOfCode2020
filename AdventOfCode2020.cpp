@@ -596,6 +596,117 @@ void RunPassportProcessing()
 }
 
 
+////////////////////////////
+// Problem 5 - Binary Boarding
+
+void IterateBoardingPass(BigInt& min, BigInt& max, bool tiltLarge)
+{
+	assert(min < max);
+	
+	const BigInt diff = max - min;
+	assert((diff & 1) != 0);
+
+	const BigInt half = (diff + 1) / 2;
+
+	if (tiltLarge)
+	{
+		min += half;
+	}
+	else
+	{
+		max -= half;
+	}
+}
+
+BigInt CalcBoardingPassSeatID(const char* pass, bool verbose)
+{
+	assert(pass != nullptr);
+	assert(strlen(pass) == 10);
+
+	if (verbose)
+		printf("Pass = %s\n", pass);
+
+	BigInt min = 0;
+	BigInt max = 127;
+
+	for (BigInt i = 0; i < 7; ++i)
+	{
+		assert(*pass != 0);
+		assert((*pass == 'F') || (*pass == 'B'));
+
+		if (verbose)
+			printf("  (%lld,%lld) -> %c -> ", min, max, *pass);
+
+		IterateBoardingPass(min, max, *pass == 'B');
+
+		if (verbose)
+			printf("(%lld,%lld)\n", min, max);
+
+		++pass;
+	}
+	assert(min == max);
+
+	const BigInt row = min;
+	if (verbose)
+		printf("  row = %lld\n", row);
+
+	min = 0;
+	max = 7;
+
+	for (BigInt i = 0; i < 3; ++i)
+	{
+		assert(*pass != 0);
+		assert((*pass == 'L') || (*pass == 'R'));
+
+		if (verbose)
+			printf("  (%lld,%lld) -> %c -> ", min, max, *pass);
+
+		IterateBoardingPass(min, max, *pass == 'R');
+
+		if (verbose)
+			printf("(%lld,%lld)\n", min, max);
+
+		++pass;
+	}
+	assert(min == max);
+
+	const BigInt column = min;
+	if (verbose)
+		printf("  column = %lld\n", column);
+
+	const BigInt seatID = (row * 8) + column;
+	if (verbose)
+		printf("  seat ID = %lld\n", seatID);
+
+	return seatID;
+}
+
+BigInt FindLargestSeatID(const std::vector<std::string>& data)
+{
+	BigInt biggest = 0;
+
+	for (BigInt i = 0; i < (BigInt)data.size(); ++i)
+	{
+		const BigInt seatID = CalcBoardingPassSeatID(data[i].c_str(), false);
+		if (seatID > biggest)
+			biggest = seatID;
+	}
+
+	return biggest;
+}
+
+void RunBinaryBoarding()
+{
+	CalcBoardingPassSeatID("FBFBBFFRLR", true);
+	CalcBoardingPassSeatID("BFFFBBFRRR", true);
+	CalcBoardingPassSeatID("FFFBBBFRRR", true);
+	CalcBoardingPassSeatID("BBFFBBFRLL", true);
+
+	std::vector<std::string> data;
+	ReadFileLines("Input\\Day5Input.txt", data);
+	printf("Largest seat ID = %lld\n", FindLargestSeatID(data));
+}
+
 
 ////////////////////////////
 ////////////////////////////
@@ -627,6 +738,9 @@ int main(int argc, char** argv)
 		break;
 	case 4:
 		RunPassportProcessing();
+		break;
+	case 5:
+		RunBinaryBoarding();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
