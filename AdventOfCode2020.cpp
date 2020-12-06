@@ -154,10 +154,10 @@ void ParseNumber(const char*& pString, char untilChar, BigInt& number)
 	number = atoi(temp);
 }
 
-void ParsePasswordLine(const char* line, BigInt& min, BigInt& max, char& ch, std::string& password)
+void ParsePasswordLine(const char* line, BigInt& num1, BigInt& num2, char& ch, std::string& password)
 {
-	ParseNumber(line, '-', min);
-	ParseNumber(line, ' ', max);
+	ParseNumber(line, '-', num1);
+	ParseNumber(line, ' ', num2);
 	ch = *line++;
 	assert(*line == ':');
 	++line;
@@ -172,41 +172,69 @@ void ParsePasswordLine(const char* line, BigInt& min, BigInt& max, char& ch, std
 	}
 }
 
-BigInt CountValidPasswords(const std::vector<std::string>& lines)
+BigInt CountValidPasswords(const std::vector<std::string>& lines, bool newScheme, bool verbose)
 {
 	BigInt numValidPasswords = 0;
 
 	std::string password;
 	for (auto iter = lines.begin(); iter != lines.end(); ++iter)
 	{
-		printf("Parsing password line:  %s\n", iter->c_str());
+		if (verbose)
+			printf("Parsing password line:  %s\n", iter->c_str());
 
-		BigInt min;
-		BigInt max;
+		BigInt num1;
+		BigInt num2;
 		char ch;
-		ParsePasswordLine(iter->c_str(), min, max, ch, password);
+		ParsePasswordLine(iter->c_str(), num1, num2, ch, password);
 
-		printf("  min = %lld, max = %lld, ch = %c, password = '%s'\n", min, max, ch, password.c_str());
+		if (verbose)
+			printf("  num1 = %lld, num2 = %lld, ch = %c, password = '%s'\n", num1, num2, ch, password.c_str());
 
-		BigInt numCh = 0;
-		for (BigInt i = 0; i < (BigInt)password.length(); ++i)
+		if (newScheme)
 		{
-			if (password[i] == ch)
+			BigInt numMatches = 0;
+
+			if (password[num1 - 1] == ch)
+				++numMatches;
+			if (password[num2 - 1] == ch)
+				++numMatches;
+
+			if (numMatches == 1)
 			{
-				++numCh;
-				if (numCh > max)
-					break;
+				++numValidPasswords;
+				if (verbose)
+					printf("  Password VALID!\n");
 			}
-		}
-
-		if ((numCh >= min) && (numCh <= max))
-		{
-			++numValidPasswords;
-			printf("  Password VALID!\n");
+			else
+			{
+				if (verbose)
+					printf("  Password invalid\n");
+			}
 		}
 		else
 		{
-			printf("  Password invalid\n");
+			BigInt numCh = 0;
+			for (BigInt i = 0; i < (BigInt)password.length(); ++i)
+			{
+				if (password[i] == ch)
+				{
+					++numCh;
+					if (numCh > num2)
+						break;
+				}
+			}
+
+			if ((numCh >= num1) && (numCh <= num2))
+			{
+				++numValidPasswords;
+				if (verbose)
+					printf("  Password VALID!\n");
+			}
+			else
+			{
+				if (verbose)
+					printf("  Password invalid\n");
+			}
 		}
 	}
 
@@ -217,11 +245,13 @@ void RunPasswordPhilosophy()
 {
 	std::vector<std::string> passwordLines1;
 	InitTestPasswordLines(passwordLines1);
-	printf("Num valid test passwords = %lld\n", CountValidPasswords(passwordLines1));
+	printf("Num valid test passwords (first scheme) = %lld\n", CountValidPasswords(passwordLines1, false, true));
+	printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines1, true, true));
 
 	std::vector<std::string> passwordLines2;
 	ReadPasswordLines("Day2Input.txt", passwordLines2);
-	printf("Num valid test passwords = %lld\n", CountValidPasswords(passwordLines2));
+	printf("Num valid test passwords (first scheme) = %lld\n", CountValidPasswords(passwordLines2, false, false));
+	printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines2, true, false));
 }
 
 
