@@ -23,12 +23,19 @@ void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
 	assert(pFile);
 
 	char string[1024];
-	while ((fgets(string, sizeof(string), pFile) != nullptr) && !feof(pFile))
+	for (;;)
 	{
+		const char* fgetsRet = fgets(string, sizeof(string), pFile);
+		if (!fgetsRet)
+			break;
+
 		const BigInt len = strlen(string);
 		if ((len > 1) && (string[len - 1] == '\n'))
 			string[len - 1] = 0;
 		lines.push_back(string);
+
+		if (feof(pFile))
+			break;
 	}
 
 	fclose(pFile);
@@ -681,18 +688,81 @@ BigInt CalcBoardingPassSeatID(const char* pass, bool verbose)
 	return seatID;
 }
 
-BigInt FindLargestSeatID(const std::vector<std::string>& data)
+void CalcSeatIDs(const std::vector<std::string>& data, std::set<BigInt>& seatIDs)
 {
-	BigInt biggest = 0;
-
+	seatIDs.clear();
 	for (BigInt i = 0; i < (BigInt)data.size(); ++i)
 	{
 		const BigInt seatID = CalcBoardingPassSeatID(data[i].c_str(), false);
-		if (seatID > biggest)
-			biggest = seatID;
+		seatIDs.insert(seatID);
+		printf("Pass %s -> Seat ID %lld\n", data[i].c_str(), seatID);
+	}
+}
+
+BigInt FindSmallestSeatID(const std::set<BigInt>& seatIDs)
+{
+	auto iter = seatIDs.cbegin();
+	if (iter == seatIDs.cend())
+		return -1;
+
+	return *iter;
+}
+
+BigInt FindLargestSeatID(const std::set<BigInt>& seatIDs)
+{
+	auto iter = seatIDs.crbegin();
+	if (iter == seatIDs.crend())
+		return -1;
+
+	return *iter;
+}
+
+void DecodeSeatID(BigInt seatID, BigInt& row, BigInt& column)
+{
+	row = seatID >> 3;
+	column = seatID & 7;
+}
+
+BigInt FindMySeatID(const std::set<BigInt>& seatIDs)
+{
+	BigInt prevSeatID = -1;
+
+	const BigInt smallestSeatID = FindSmallestSeatID(seatIDs);
+	BigInt smallestRow, smallestColumn;
+	DecodeSeatID(smallestSeatID, smallestRow, smallestColumn);
+
+	const BigInt largestSeatID = FindLargestSeatID(seatIDs);
+	BigInt largestRow, largestColumn;
+	DecodeSeatID(largestSeatID, largestRow, largestColumn);
+
+	printf("Seat IDs range from %lld (%lld,%lld) to %lld (%lld,%lld)\n", smallestSeatID, smallestRow, smallestColumn, largestSeatID, largestRow, largestColumn);
+
+	BigInt mySeatID = -1;
+	for (auto iter = seatIDs.cbegin(); iter != seatIDs.cend(); ++iter)
+	{
+		const BigInt seatID = *iter;
+		
+		if (prevSeatID > 0)
+		{
+			const BigInt diff = seatID - prevSeatID;
+			if (diff > 1)
+			{
+				printf("Found gap between %lld and %lld\n", prevSeatID, seatID);
+
+				BigInt row, column;
+				DecodeSeatID(seatID, row, column);
+				printf("Seat ID %lld = row %lld, column %lld\n", seatID, row, column);
+
+				assert(mySeatID < 0);
+				assert(diff == 2);
+				mySeatID = seatID - 1;
+			}
+		}
+
+		prevSeatID = seatID;
 	}
 
-	return biggest;
+	return mySeatID;
 }
 
 void RunBinaryBoarding()
@@ -704,7 +774,12 @@ void RunBinaryBoarding()
 
 	std::vector<std::string> data;
 	ReadFileLines("Input\\Day5Input.txt", data);
-	printf("Largest seat ID = %lld\n", FindLargestSeatID(data));
+
+	std::set<BigInt> seatIDs;
+	CalcSeatIDs(data, seatIDs);
+	printf("Largest seat ID = %lld\n", FindLargestSeatID(seatIDs));
+
+	printf("My seat ID = %lld\n", FindMySeatID(seatIDs));
 }
 
 
