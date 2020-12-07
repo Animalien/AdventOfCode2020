@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <map>
 #include <set>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -11,9 +12,16 @@
 
 ////////////////////////////
 ////////////////////////////
-// General tools
+// Shared tools
+
+////////////////////////////
+// Numeric
 
 typedef long long BigInt;
+
+
+////////////////////////////
+// Strings
 
 void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
 {
@@ -40,6 +48,78 @@ void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
 
 	fclose(pFile);
 }
+
+void Tokenize(const std::string& st, std::vector<std::string>& tokens, char delim)
+{
+	std::stringstream stream(st);
+
+	tokens.clear();
+	std::string token;
+	while (std::getline(stream, token, delim))
+	{
+		tokens.push_back(token);
+	}
+}
+
+bool StringHasDigits(const std::string& st, BigInt start = 0, BigInt end = -1)
+{
+	if (end <= 0)
+		end = st.length() - 1;
+
+	for (BigInt i = start; i <= end; ++i)
+	{
+		const char ch = st[i];
+		if (ch < '0')
+			return false;
+		if (ch > '9')
+			return false;
+	}
+
+	return true;
+}
+
+bool StringHasLowerCaseAlphaNumeric(const std::string& st, BigInt start = 0, BigInt end = -1)
+{
+	if (end <= 0)
+		end = st.length() - 1;
+
+	for (BigInt i = start; i <= end; ++i)
+	{
+		const char ch = st[i];
+		if ((ch >= '0') && (ch <= '9'))
+			continue;
+		if ((ch >= 'a') && (ch <= 'z'))
+			continue;
+		return false;
+	}
+
+	return true;
+}
+
+bool StringIsIntWithinRange(const std::string& st, BigInt min, BigInt max, BigInt skipLastChars = 0)
+{
+	if (st.empty())
+		return false;
+	if (!StringHasDigits(st, 0, st.length() - skipLastChars - 1))
+		return false;
+
+	const BigInt value = atoi(st.c_str());
+	return ((value >= min) && (value <= max));
+}
+
+bool StringIsIntWithinRangeAndSuffix(const std::string& st, BigInt min, BigInt max, const char* suffix, BigInt suffixLen)
+{
+	if ((BigInt)st.length() <= suffixLen)
+		return false;
+	if (st.compare(st.length() - suffixLen, suffixLen, suffix) != 0)
+		return false;
+
+	return StringIsIntWithinRange(st, min, max, suffixLen);
+}
+
+
+////////////////////////////
+// Sets
 
 template <typename T>
 void IntersectSet(std::set<T>& lhs, const std::set<T>& rhs)
@@ -446,62 +526,6 @@ void PassportEntry::ReadField(const char* fieldName, const char* fieldValue, boo
 
 	if (verbose)
 		printf("Read field '%s' = '%s'\n", fieldName, fieldValue);
-}
-
-bool StringHasDigits(const std::string& st, BigInt start = 0, BigInt end = -1)
-{
-	if (end <= 0)
-		end = st.length() - 1;
-
-	for (BigInt i = start; i <= end; ++i)
-	{
-		const char ch = st[i];
-		if (ch < '0')
-			return false;
-		if (ch > '9')
-			return false;
-	}
-
-	return true;
-}
-
-bool StringHasLowerCaseAlphaNumeric(const std::string& st, BigInt start = 0, BigInt end = -1)
-{
-	if (end <= 0)
-		end = st.length() - 1;
-
-	for (BigInt i = start; i <= end; ++i)
-	{
-		const char ch = st[i];
-		if ((ch >= '0') && (ch <= '9'))
-			continue;
-		if ((ch >= 'a') && (ch <= 'z'))
-			continue;
-		return false;
-	}
-
-	return true;
-}
-
-bool StringIsIntWithinRange(const std::string& st, BigInt min, BigInt max, BigInt skipLastChars = 0)
-{
-	if (st.empty())
-		return false;
-	if (!StringHasDigits(st, 0, st.length() - skipLastChars - 1))
-		return false;
-
-	const BigInt value = atoi(st.c_str());
-	return ((value >= min) && (value <= max));
-}
-
-bool StringIsIntWithinRangeAndSuffix(const std::string& st, BigInt min, BigInt max, const char* suffix, BigInt suffixLen)
-{
-	if ((BigInt)st.length() <= suffixLen)
-		return false;
-	if (st.compare(st.length() - suffixLen, suffixLen, suffix) != 0)
-		return false;
-
-	return StringIsIntWithinRange(st, min, max, suffixLen);
 }
 
 bool PassportEntry::IsValid() const
@@ -916,6 +940,174 @@ void RunCustomCustoms()
 
 
 ////////////////////////////
+// Problem 7 - Handy Haversacks
+
+struct Haversack
+{
+	std::string						type;
+	std::map<std::string,BigInt>	contains;
+	std::set<std::string>			canBeContainedBy;
+};
+
+const Haversack& GetConstHaversackFromData(const std::map<std::string, Haversack>& data, const std::string& type)
+{
+	auto findHaver = data.find(type);
+	assert(findHaver != data.end());
+
+	return findHaver->second;
+}
+
+Haversack& GetHaversackFromData(std::map<std::string, Haversack>& data, const std::string& type)
+{
+	auto insertHaver = data.insert(std::pair<std::string, Haversack>(type, Haversack()));
+	auto nodeIter = insertHaver.first;
+	Haversack& rHaversack = nodeIter->second;
+	if (insertHaver.second)
+		rHaversack.type = type;
+	return rHaversack;
+}
+
+void ReadHaversackData(const char* fileName, std::map<std::string,Haversack>& data)
+{
+	data.clear();
+
+	std::vector<std::string> lines;
+	ReadFileLines(fileName, lines);
+
+	std::vector<std::string> tokens;
+	for (BigInt i = 0; i < (BigInt)lines.size(); ++i)
+	{
+		Tokenize(lines[i], tokens, ' ');
+
+		assert(tokens.size() >= 7);
+		const std::string type = tokens[0] + ' ' + tokens[1];
+
+		Haversack& thisHaversack = GetHaversackFromData(data, type);
+
+		assert(tokens[2] == "bags");
+		assert(tokens[3] == "contain");
+
+		if (tokens[4] == "no")
+			continue;
+
+		BigInt index = 4;
+		while ((tokens.size() - index) >= 4)
+		{
+			const std::string& numString = tokens[index];
+			assert(StringHasDigits(numString));
+
+			const BigInt number = atoi(numString.c_str());
+
+			const std::string otherType = tokens[index + 1] + ' ' + tokens[index + 2];
+
+			Haversack& otherHaversack = GetHaversackFromData(data, otherType);
+
+			thisHaversack.contains.insert(std::pair<std::string, BigInt>(otherType, number));
+			otherHaversack.canBeContainedBy.insert(type);
+
+			index += 4;
+		}
+	}
+}
+
+void PrintHaversackData(const std::map<std::string, Haversack>& data)
+{
+	printf("Haversack data:\n");
+	for (auto iter = data.cbegin(); iter != data.cend(); ++iter)
+	{
+		const Haversack& haversack = iter->second;
+		printf("  Type = '%s' ", haversack.type.c_str());
+
+		if (!haversack.contains.empty())
+		{
+			printf(", Contains: ");
+			for (auto iter2 = haversack.contains.cbegin(); iter2 != haversack.contains.cend(); ++iter2)
+				printf("%lld x '%s' ", iter2->second, iter2->first.c_str());
+		}
+
+		if (!haversack.canBeContainedBy.empty())
+		{
+			printf(", Can be contained by: ");
+			for (auto iter2 = haversack.canBeContainedBy.cbegin(); iter2 != haversack.canBeContainedBy.cend(); ++iter2)
+				printf("'%s' ", iter2->c_str());
+		}
+
+		printf("\n");
+	}
+}
+
+BigInt CalcHowManyBagsCanContain(const std::map<std::string, Haversack>& data, const std::string& type, bool verbose, std::set<std::string>* pAlreadyCheckedSet = nullptr)
+{
+	const Haversack& haversack = GetConstHaversackFromData(data, type);
+
+	std::set<std::string> alreadyCheckedSetInit;
+	if (!pAlreadyCheckedSet)
+		pAlreadyCheckedSet = &alreadyCheckedSetInit;
+
+	BigInt count = 0;
+
+	if (verbose)
+		printf("Type '%s'\n", type.c_str());
+	for (auto iter = haversack.canBeContainedBy.cbegin(); iter != haversack.canBeContainedBy.cend(); ++iter)
+	{
+		if (pAlreadyCheckedSet->count(*iter) > 0)
+			continue;
+
+		if (verbose)
+			printf("Can be contained by '%s'\n", iter->c_str());
+
+		count += 1;
+		count += CalcHowManyBagsCanContain(data, *iter, verbose, pAlreadyCheckedSet);
+
+		pAlreadyCheckedSet->insert(*iter);
+	}
+
+	return count;
+}
+
+BigInt CalcHowManyBagsAreContained(const std::map<std::string, Haversack>& data, const std::string& type, bool verbose)
+{
+	const Haversack& haversack = GetConstHaversackFromData(data, type);
+
+	BigInt count = 0;
+
+	if (verbose)
+		printf("Type '%s'\n", type.c_str());
+	for (auto iter = haversack.contains.cbegin(); iter != haversack.contains.cend(); ++iter)
+	{
+		if (verbose)
+			printf("Contains %lld of '%s'\n", iter->second, iter->first.c_str());
+
+		count += (iter->second * (1 + CalcHowManyBagsAreContained(data, iter->first, verbose)));
+	}
+
+	return count;
+}
+
+void RunHandyHaversacks()
+{
+	std::map<std::string, Haversack> testData;
+	ReadHaversackData("Input\\Day7TestInput.txt", testData);
+	PrintHaversackData(testData);
+
+	std::map<std::string, Haversack> data;
+	ReadHaversackData("Input\\Day7Input.txt", data);
+
+	const std::string interestingType = "shiny gold";
+	printf("Number of bags in test data that can contain '%s' = %lld\n", interestingType.c_str(), CalcHowManyBagsCanContain(testData, interestingType, true));
+	printf("Number of bags in main data that can contain '%s' = %lld\n", interestingType.c_str(), CalcHowManyBagsCanContain(data, interestingType, false));
+
+	std::map<std::string, Haversack> testDataA;
+	ReadHaversackData("Input\\Day7TestInputA.txt", testDataA);
+	PrintHaversackData(testDataA);
+
+	printf("Number of bags in test data that '%s' contains = %lld\n", interestingType.c_str(), CalcHowManyBagsAreContained(testData, interestingType, true));
+	printf("Number of bags in test data that '%s' contains = %lld\n", interestingType.c_str(), CalcHowManyBagsAreContained(testDataA, interestingType, true));
+	printf("Number of bags in main data that '%s' contains = %lld\n", interestingType.c_str(), CalcHowManyBagsAreContained(data, interestingType, false));
+}
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -951,6 +1143,9 @@ int main(int argc, char** argv)
 		break;
 	case 6:
 		RunCustomCustoms();
+		break;
+	case 7:
+		RunHandyHaversacks();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
