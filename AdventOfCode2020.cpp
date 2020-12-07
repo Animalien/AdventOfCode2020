@@ -41,6 +41,46 @@ void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
 	fclose(pFile);
 }
 
+template <typename T>
+void IntersectSet(std::set<T>& lhs, const std::set<T>& rhs)
+{
+	std::set<T> newSet;
+
+	auto iterLeft = lhs.cbegin();
+	const auto iterLeftEnd = lhs.cend();
+
+	auto iterRight = rhs.cbegin();
+	const auto iterRightEnd = rhs.cend();
+
+	for (;;)
+	{
+		if (iterLeft == iterLeftEnd)
+			break;
+		if (iterRight == iterRightEnd)
+			break;
+
+		const T& leftValue = *iterLeft;
+		const T& rightValue = *iterRight;
+
+		if (leftValue == rightValue)
+		{
+			newSet.insert(*iterLeft);
+			++iterLeft;
+			++iterRight;
+		}
+		else if (leftValue < rightValue)
+		{
+			++iterLeft;
+		}
+		else
+		{
+			++iterRight;
+		}
+	}
+
+	lhs.swap(newSet);
+}
+
 
 ////////////////////////////
 ////////////////////////////
@@ -786,7 +826,7 @@ void RunBinaryBoarding()
 ////////////////////////////
 // Problem 6 - Custom Customs
 
-BigInt CalcSumQuestionCounts(const std::vector<std::string>& data, bool verbose)
+BigInt CalcSumQuestionCountsAnyone(const std::vector<std::string>& data, bool verbose)
 {
 	BigInt sum = 0;
 
@@ -818,15 +858,59 @@ BigInt CalcSumQuestionCounts(const std::vector<std::string>& data, bool verbose)
 	return sum;
 }
 
+BigInt CalcSumQuestionCountsEveryone(const std::vector<std::string>& data, bool verbose)
+{
+	BigInt sum = 0;
+
+	std::set<char> intersectionQuestionSet;
+	bool newPersonGroup = true;
+	std::set<char> currQuestionSet;
+
+	for (BigInt i = 0; i < (BigInt)data.size(); ++i)
+	{
+		if (data[i].empty())
+		{
+			sum += intersectionQuestionSet.size();
+			if (verbose)
+				printf("Counted %lld answers\n", intersectionQuestionSet.size());
+			intersectionQuestionSet.clear();
+			newPersonGroup = true;
+		}
+		else
+		{
+			currQuestionSet.clear();
+			const std::string& answers = data[i];
+			for (BigInt j = 0; j < (BigInt)answers.length(); ++j)
+			{
+				currQuestionSet.insert(answers[j]);
+			}
+
+			if (newPersonGroup)
+				intersectionQuestionSet = currQuestionSet;
+			else
+				IntersectSet(intersectionQuestionSet, currQuestionSet);
+			newPersonGroup = false;
+		}
+	}
+
+	sum += intersectionQuestionSet.size();
+	if (verbose)
+		printf("Counted %lld answers\n", intersectionQuestionSet.size());
+
+	return sum;
+}
+
 void RunCustomCustoms()
 {
 	std::vector<std::string> testData;
 	ReadFileLines("Input\\Day6TestInput.txt", testData);
-	printf("Sum question counts of test data = %lld\n", CalcSumQuestionCounts(testData, true));
+	printf("Sum question counts (anyone style) of test data = %lld\n", CalcSumQuestionCountsAnyone(testData, false));
+	printf("Sum question counts (everyone style) of test data = %lld\n", CalcSumQuestionCountsEveryone(testData, true));
 
 	std::vector<std::string> data;
 	ReadFileLines("Input\\Day6Input.txt", data);
-	printf("Sum question counts = %lld\n", CalcSumQuestionCounts(data, true));
+	printf("Sum question counts (anyone style) = %lld\n", CalcSumQuestionCountsAnyone(data, false));
+	printf("Sum question counts (everyone style) = %lld\n", CalcSumQuestionCountsEveryone(data, false));
 }
 
 
