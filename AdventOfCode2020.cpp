@@ -30,7 +30,7 @@ void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
 			break;
 
 		const BigInt len = strlen(string);
-		if ((len > 1) && (string[len - 1] == '\n'))
+		if ((len > 0) && (string[len - 1] == '\n'))
 			string[len - 1] = 0;
 		lines.push_back(string);
 
@@ -784,6 +784,54 @@ void RunBinaryBoarding()
 
 
 ////////////////////////////
+// Problem 6 - Custom Customs
+
+BigInt CalcSumQuestionCounts(const std::vector<std::string>& data, bool verbose)
+{
+	BigInt sum = 0;
+
+	std::set<char> questionSet;
+
+	for (BigInt i=0; i<(BigInt)data.size(); ++i)
+	{
+		if (data[i].empty())
+		{
+			sum += questionSet.size();
+			if (verbose)
+				printf("Counted %lld answers\n", questionSet.size());
+			questionSet.clear();
+		}
+		else
+		{
+			const std::string& answers = data[i];
+			for (BigInt j = 0; j < (BigInt)answers.length(); ++j)
+			{
+				questionSet.insert(answers[j]);
+			}
+		}
+	}
+
+	sum += questionSet.size();
+	if (verbose)
+		printf("Counted %lld answers\n", questionSet.size());
+
+	return sum;
+}
+
+void RunCustomCustoms()
+{
+	std::vector<std::string> testData;
+	ReadFileLines("Input\\Day6TestInput.txt", testData);
+	printf("Sum question counts of test data = %lld\n", CalcSumQuestionCounts(testData, true));
+
+	std::vector<std::string> data;
+	ReadFileLines("Input\\Day6Input.txt", data);
+	printf("Sum question counts = %lld\n", CalcSumQuestionCounts(data, true));
+}
+
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -816,6 +864,9 @@ int main(int argc, char** argv)
 		break;
 	case 5:
 		RunBinaryBoarding();
+		break;
+	case 6:
+		RunCustomCustoms();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
