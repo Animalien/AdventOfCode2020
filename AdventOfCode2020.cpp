@@ -1114,11 +1114,11 @@ void RunHandyHaversacks()
 ////////////////////////////
 // Problem 8 - Handheld Halting
 
-enum InstructionType
+enum class InstructionType
 {
-	InstructionType_NOP,
-	InstructionType_ACC,
-	InstructionType_JMP,
+	NOP,
+	ACC,
+	JMP,
 };
 
 struct Instruction
@@ -1133,6 +1133,7 @@ public:
 	Program(const char* fileName)
 		: m_nextInstructionIndex(0)
 		, m_accumulator(0)
+		, m_programTerminated(false)
 	{
 		std::vector<std::string> lines;
 		std::vector<std::string> tokens;
@@ -1146,13 +1147,13 @@ public:
 
 			Instruction newInstruction;
 			if (tokens[0] == "nop")
-				newInstruction.type = InstructionType_NOP;
+				newInstruction.type = InstructionType::NOP;
 			else if (tokens[0] == "acc")
-				newInstruction.type = InstructionType_ACC;
+				newInstruction.type = InstructionType::ACC;
 			else
 			{
 				assert(tokens[0] == "jmp");
-				newInstruction.type = InstructionType_JMP;
+				newInstruction.type = InstructionType::JMP;
 			}
 
 			newInstruction.arg = atoi(tokens[1].c_str());
@@ -1168,31 +1169,44 @@ public:
 		m_nextInstructionIndex = 0;
 		m_accumulator = 0;
 		std::fill(m_instructionRunCounts.begin(), m_instructionRunCounts.end(), false);
+		m_programTerminated = false;
 	}
 
 	BigInt GetAccumulator() const { return m_accumulator; }
+	bool DidProgramTerminate() const { return m_programTerminated; }
 
 	void ExecuteNextInstruction(bool verbose)
 	{
+		assert(!m_programTerminated);
+
 		const BigInt instructionToExecute = m_nextInstructionIndex;
+		if (instructionToExecute >= (BigInt)m_instructions.size())
+		{
+			assert(instructionToExecute == (BigInt)m_instructions.size());
+			m_programTerminated = true;
+			if (verbose)
+				printf("Program terminated\n");
+			return;
+		}
+
 		const Instruction& nextInstruction = m_instructions[instructionToExecute];
 		switch (nextInstruction.type)
 		{
-		case InstructionType_NOP:
+		case InstructionType::NOP:
 		default:
-			assert(nextInstruction.type == InstructionType_NOP);
+			assert(nextInstruction.type == InstructionType::NOP);
 			// nothing-doing
 			++m_nextInstructionIndex;
 			if (verbose)
 				printf("%lld: NOP %+lld\n", instructionToExecute, nextInstruction.arg);
 			break;
-		case InstructionType_ACC:
+		case InstructionType::ACC:
 			m_accumulator += nextInstruction.arg;
 			++m_nextInstructionIndex;
 			if (verbose)
 				printf("%lld: ACC %+lld, %lld = %lld%+lld\n", instructionToExecute, nextInstruction.arg, m_accumulator, m_accumulator - nextInstruction.arg, nextInstruction.arg);
 			break;
-		case InstructionType_JMP:
+		case InstructionType::JMP:
 			m_nextInstructionIndex += nextInstruction.arg;
 			if (verbose)
 				printf("%lld: JMP %+lld, %lld = %lld%+lld\n", instructionToExecute, nextInstruction.arg, m_nextInstructionIndex, m_nextInstructionIndex - nextInstruction.arg, nextInstruction.arg);
@@ -1201,12 +1215,65 @@ public:
 		++m_instructionRunCounts[instructionToExecute];
 	}
 
-	BigInt HasNextInstructionBeenRunBefore() const { return m_instructionRunCounts[m_nextInstructionIndex] > 0; }
+	BigInt HasNextInstructionBeenRunBefore() const { return (m_nextInstructionIndex < (BigInt)m_instructionRunCounts.size()) && (m_instructionRunCounts[m_nextInstructionIndex] > 0); }
 
-	void ExecuteUntilLoop(bool verbose)
+	void ExecuteUntilLoopsOrTerminates(bool verbose)
 	{
-		while (!HasNextInstructionBeenRunBefore())
+		while (!HasNextInstructionBeenRunBefore() && !DidProgramTerminate())
 			ExecuteNextInstruction(verbose);
+
+		if (verbose && HasNextInstructionBeenRunBefore())
+			printf("Program began to loop\n");
+	}
+
+	void FindFix(BigInt& instructionToFix, InstructionType& origInstructionType, BigInt& accumlatorAfterTermination, bool verbose)
+	{
+		for (BigInt i = 0; i < (BigInt)m_instructions.size(); ++i)
+		{
+			Instruction& instruction = m_instructions[i];
+			if (instruction.type == InstructionType::ACC)
+				continue;
+
+			const InstructionType typeBackup = instruction.type;
+			if (instruction.type == InstructionType::NOP)
+			{
+				instruction.type = InstructionType::JMP;
+				if (verbose)
+					printf("Changing instruction %lld from NOP to JMP\n", i);
+			}
+			else
+			{
+				instruction.type = InstructionType::NOP;
+				if (verbose)
+					printf("Changing instruction %lld from JMP to NOP\n", i);
+			}
+
+			ResetExecution();
+			ExecuteUntilLoopsOrTerminates(false);
+
+			instruction.type = typeBackup;
+
+			if (DidProgramTerminate())
+			{
+				instructionToFix = i;
+				origInstructionType = typeBackup;
+				accumlatorAfterTermination = m_accumulator;
+				if (verbose)
+					printf("Program terminated successfully!!!\n");
+				return;
+			}
+
+			if (verbose)
+				printf("Program began to loop\n");
+		}
+
+		if (verbose)
+		{
+			instructionToFix = -1;
+			origInstructionType = InstructionType::NOP;
+			accumlatorAfterTermination = -1;
+			printf("Fix not found!!!\n");
+		}
 	}
 
 
@@ -1216,19 +1283,37 @@ private:
 	BigInt						m_nextInstructionIndex;
 	BigInt						m_accumulator;
 	std::vector<BigInt>			m_instructionRunCounts;
+	bool						m_programTerminated;
 };
 
 void RunHandheldHalting()
 {
 	Program testProgram("Day8TestInput.txt");
-	printf("Test program:\n");
-	testProgram.ExecuteUntilLoop(true);
+	printf("Test program, running until loop:\n");
+	testProgram.ExecuteUntilLoopsOrTerminates(true);
 	printf("Accumulator = %lld\n", testProgram.GetAccumulator());
+	printf("Fixing test program\n");
+	BigInt instructionToFix;
+	InstructionType origInstructionType;
+	BigInt accumulatorAfterFix;
+	testProgram.FindFix(instructionToFix, origInstructionType, accumulatorAfterFix, true);
+	printf("Test program was fixed by changing instruction %lld from %s to %s, allowing program to terminate normally with accumulator = %lld\n",
+		instructionToFix,
+		(origInstructionType == InstructionType::NOP) ? "NOP" : "JMP",
+		(origInstructionType == InstructionType::NOP) ? "JMP" : "NOP",
+		accumulatorAfterFix);
 
 	Program program("Day8Input.txt");
-	printf("\nMain program:\n");
-	program.ExecuteUntilLoop(true);
+	printf("\nMain program, running until loop:\n");
+	program.ExecuteUntilLoopsOrTerminates(false);
 	printf("Accumulator = %lld\n", program.GetAccumulator());
+	printf("Fixing main program\n");
+	program.FindFix(instructionToFix, origInstructionType, accumulatorAfterFix, true);
+	printf("Main program was fixed by changing instruction %lld from %s to %s, allowing program to terminate normally with accumulator = %lld\n",
+		instructionToFix,
+		(origInstructionType == InstructionType::NOP) ? "NOP" : "JMP",
+		(origInstructionType == InstructionType::NOP) ? "JMP" : "NOP",
+		accumulatorAfterFix);
 }
 
 
