@@ -23,11 +23,15 @@ typedef long long BigInt;
 ////////////////////////////
 // Strings
 
+static const char* fileNameBase = "..\\Repo\\AdventOfCode2020\\Input\\";
+
 void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
 {
 	lines.clear();
 
-	FILE* pFile = fopen(fileName, "rt");
+	std::string fullFileName = fileNameBase;
+	fullFileName += fileName;
+	FILE* pFile = fopen(fullFileName.c_str(), "rt");
 	assert(pFile);
 
 	char string[1024];
@@ -249,7 +253,7 @@ void RunReportRepair()
 	FindReportRepairThreeNums(set1);
 
 	std::set<BigInt> set2;
-	ReadReportRepairInput("Input\\Day1Input.txt", set2);
+	ReadReportRepairInput("Day1Input.txt", set2);
 	FindReportRepairTwoNums(set2);
 	FindReportRepairThreeNums(set2);
 }
@@ -380,7 +384,7 @@ void RunPasswordPhilosophy()
 	printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines1, true, true));
 
 	std::vector<std::string> passwordLines2;
-	ReadFileLines("Input\\Day2Input.txt", passwordLines2);
+	ReadFileLines("Day2Input.txt", passwordLines2);
 	printf("Num valid test passwords (first scheme) = %lld\n", CountValidPasswords(passwordLines2, false, false));
 	printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines2, true, false));
 }
@@ -467,7 +471,7 @@ void RunTobogganTrajectory()
 	CalcProdNumTreesDifferentSlopes(testData);
 
 	std::vector<std::string> fileData;
-	ReadFileLines("Input\\Day3Input.txt", fileData);
+	ReadFileLines("Day3Input.txt", fileData);
 	printf("Num trees encountered in file data with slope (%lld,%lld) = %lld\n", rightStep, downStep, CountTobogTrajTrees(fileData, rightStep, downStep, false));
 	CalcProdNumTreesDifferentSlopes(fileData);
 }
@@ -653,16 +657,16 @@ BigInt CountValidPassports(const std::vector<PassportEntry>& data)
 void RunPassportProcessing()
 {
 	std::vector<PassportEntry> testData;
-	ReadPassportFile("Input\\Day4TestInput.txt", testData, true);
+	ReadPassportFile("Day4TestInput.txt", testData, true);
 	printf("Num valid passports in test data = %lld\n", CountValidPassports(testData));
 
 	std::vector<PassportEntry> invalidData;
-	ReadPassportFile("Input\\Day4InvalidInput.txt", invalidData, true);
+	ReadPassportFile("Day4InvalidInput.txt", invalidData, true);
 	std::vector<PassportEntry> validData;
-	ReadPassportFile("Input\\Day4ValidInput.txt", validData, true);
+	ReadPassportFile("Day4ValidInput.txt", validData, true);
 
 	std::vector<PassportEntry> data;
-	ReadPassportFile("Input\\Day4Input.txt", data, false);
+	ReadPassportFile("Day4Input.txt", data, false);
 	printf("Num valid passports in data = %lld\n", CountValidPassports(data));
 }
 
@@ -837,7 +841,7 @@ void RunBinaryBoarding()
 	CalcBoardingPassSeatID("BBFFBBFRLL", true);
 
 	std::vector<std::string> data;
-	ReadFileLines("Input\\Day5Input.txt", data);
+	ReadFileLines("Day5Input.txt", data);
 
 	std::set<BigInt> seatIDs;
 	CalcSeatIDs(data, seatIDs);
@@ -927,12 +931,12 @@ BigInt CalcSumQuestionCountsEveryone(const std::vector<std::string>& data, bool 
 void RunCustomCustoms()
 {
 	std::vector<std::string> testData;
-	ReadFileLines("Input\\Day6TestInput.txt", testData);
+	ReadFileLines("Day6TestInput.txt", testData);
 	printf("Sum question counts (anyone style) of test data = %lld\n", CalcSumQuestionCountsAnyone(testData, false));
 	printf("Sum question counts (everyone style) of test data = %lld\n", CalcSumQuestionCountsEveryone(testData, true));
 
 	std::vector<std::string> data;
-	ReadFileLines("Input\\Day6Input.txt", data);
+	ReadFileLines("Day6Input.txt", data);
 	printf("Sum question counts (anyone style) = %lld\n", CalcSumQuestionCountsAnyone(data, false));
 	printf("Sum question counts (everyone style) = %lld\n", CalcSumQuestionCountsEveryone(data, false));
 }
@@ -1087,24 +1091,25 @@ BigInt CalcHowManyBagsAreContained(const std::map<std::string, Haversack>& data,
 void RunHandyHaversacks()
 {
 	std::map<std::string, Haversack> testData;
-	ReadHaversackData("Input\\Day7TestInput.txt", testData);
+	ReadHaversackData("Day7TestInput.txt", testData);
 	PrintHaversackData(testData);
 
 	std::map<std::string, Haversack> data;
-	ReadHaversackData("Input\\Day7Input.txt", data);
+	ReadHaversackData("Day7Input.txt", data);
 
 	const std::string interestingType = "shiny gold";
 	printf("Number of bags in test data that can contain '%s' = %lld\n", interestingType.c_str(), CalcHowManyBagsCanContain(testData, interestingType, true));
 	printf("Number of bags in main data that can contain '%s' = %lld\n", interestingType.c_str(), CalcHowManyBagsCanContain(data, interestingType, false));
 
 	std::map<std::string, Haversack> testDataA;
-	ReadHaversackData("Input\\Day7TestInputA.txt", testDataA);
+	ReadHaversackData("Day7TestInputA.txt", testDataA);
 	PrintHaversackData(testDataA);
 
 	printf("Number of bags in test data that '%s' contains = %lld\n", interestingType.c_str(), CalcHowManyBagsAreContained(testData, interestingType, true));
 	printf("Number of bags in test data that '%s' contains = %lld\n", interestingType.c_str(), CalcHowManyBagsAreContained(testDataA, interestingType, true));
 	printf("Number of bags in main data that '%s' contains = %lld\n", interestingType.c_str(), CalcHowManyBagsAreContained(data, interestingType, false));
 }
+
 
 
 ////////////////////////////
