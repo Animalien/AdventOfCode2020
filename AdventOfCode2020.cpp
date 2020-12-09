@@ -1317,6 +1317,79 @@ void RunHandheldHalting()
 }
 
 
+////////////////////////////
+// Problem 9 - Encoding Error
+
+class XMasNumberSeries
+{
+public:
+	XMasNumberSeries(BigInt windowSize, const char* fileName)
+		: m_windowSize(windowSize)
+	{
+		std::vector<std::string> lines;
+		ReadFileLines(fileName, lines);
+		for (BigInt i = 0; i < (BigInt)lines.size(); ++i)
+		{
+			m_numbers.push_back(atoi(lines[i].c_str()));
+		}
+	}
+
+	BigInt FindFirstInvalidNumber(bool verbose) const
+	{
+		std::set<BigInt> rollingSet;
+
+		for (BigInt i = 0; i < m_windowSize; ++i)
+			rollingSet.insert(m_numbers[i]);
+
+		for (BigInt i = m_windowSize; i < (BigInt)m_numbers.size(); ++i)
+		{
+			const BigInt thisNumber = m_numbers[i];
+
+			bool thisNumberIsValid = false;
+			assert(rollingSet.size() == m_windowSize);
+			for (auto iter = rollingSet.cbegin(); iter != rollingSet.cend(); ++iter)
+			{
+				const BigInt firstNumber = *iter;
+				const BigInt secondNumber = thisNumber - firstNumber;
+
+				if ((secondNumber <= 0) || (secondNumber < firstNumber))
+					break;
+
+				if (rollingSet.count(secondNumber) > 0)
+				{
+					thisNumberIsValid = true;
+					if (verbose)
+						printf("This number %lld is the sum of %lld and %lld, therefore valid\n", thisNumber, firstNumber, secondNumber);
+					break;
+				}
+			}
+
+			if (!thisNumberIsValid)
+				return thisNumber;
+
+			rollingSet.erase(m_numbers[i - m_windowSize]);
+			rollingSet.insert(thisNumber);
+			assert(rollingSet.size() == m_windowSize);
+		}
+
+		return -1;
+	}
+
+
+private:
+	BigInt					m_windowSize;
+	std::vector<BigInt>		m_numbers;
+};
+
+void RunEncodingError()
+{
+	XMasNumberSeries testSeries(5, "Day9TestInput.txt");
+	printf("First invalid number in test series = %lld\n", testSeries.FindFirstInvalidNumber(true));
+
+	XMasNumberSeries mainSeries(25, "Day9Input.txt");
+	printf("First invalid number in main series = %lld\n", mainSeries.FindFirstInvalidNumber(true));
+}
+
 
 ////////////////////////////
 ////////////////////////////
@@ -1360,6 +1433,9 @@ int main(int argc, char** argv)
 		break;
 	case 8:
 		RunHandheldHalting();
+		break;
+	case 9:
+		RunEncodingError();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
