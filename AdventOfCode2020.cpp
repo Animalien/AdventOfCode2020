@@ -1375,6 +1375,123 @@ public:
 		return -1;
 	}
 
+	BigInt FindEncryptionWeakness(BigInt invalidNumber, bool verbose) const
+	{
+		assert(invalidNumber = FindFirstInvalidNumber(false));
+
+		BigInt sum = 0;
+		std::set<BigInt> numbersInSum;
+
+		assert(m_numbers.size() >= 2);
+
+		BigInt firstIndex = 0;
+		BigInt secondIndex = 1;
+		const BigInt firstNumber = m_numbers[firstIndex];
+		const BigInt secondNumber = m_numbers[secondIndex];
+
+		sum = firstNumber + secondNumber;
+		if (sum == invalidNumber)
+		{
+			if (verbose)
+				printf("Immediately found encryption weakness with first number = %lld, second number = %lld\n", firstNumber, secondNumber);
+			return sum;
+		}
+
+		numbersInSum.insert(firstNumber);
+		numbersInSum.insert(secondNumber);
+
+		if (verbose)
+			printf("Starting with first number = %lld, second number = %lld\n", firstNumber, secondNumber);
+
+		for (;;)
+		{
+			if (sum < invalidNumber)
+			{
+				if (secondIndex >= ((BigInt)m_numbers.size() - 1))
+					return -1;
+
+				++secondIndex;
+				const BigInt newNumber = m_numbers[secondIndex];
+				sum += newNumber;
+				numbersInSum.insert(newNumber);
+
+				if (verbose)
+				{
+					printf("Added new second number, sum = %lld, sequence is now:  ", sum);
+					for (BigInt i = firstIndex; i <= secondIndex; ++i)
+					{
+						printf("%lld ", m_numbers[i]);
+					}
+					printf("\n");
+				}
+			}
+			else
+			{
+				assert(sum > invalidNumber);
+
+				const BigInt prevNumber = m_numbers[firstIndex];
+				sum -= prevNumber;
+				numbersInSum.erase(prevNumber);
+				++firstIndex;
+
+				if (firstIndex == secondIndex)
+				{
+					if (secondIndex >= ((BigInt)m_numbers.size() - 1))
+						return -1;
+
+					++secondIndex;
+					const BigInt newNumber = m_numbers[secondIndex];
+					sum += newNumber;
+					numbersInSum.insert(newNumber);
+
+					if (verbose)
+					{
+						printf("Incremented first and second numbers, sum = %lld, sequence is now:  ", sum);
+						for (BigInt i = firstIndex; i <= secondIndex; ++i)
+						{
+							printf("%lld ", m_numbers[i]);
+						}
+						printf("\n");
+					}
+				}
+				else
+				{
+					if (verbose)
+					{
+						printf("Removed first number, sum = %lld, sequence is now:  ", sum);
+						for (BigInt i = firstIndex; i <= secondIndex; ++i)
+						{
+							printf("%lld ", m_numbers[i]);
+						}
+						printf("\n");
+					}
+				}
+			}
+
+			if (sum == invalidNumber)
+			{
+				assert(numbersInSum.size() >= 2);
+				const BigInt smallest = *numbersInSum.cbegin();
+				const BigInt largest = *numbersInSum.crbegin();
+				const BigInt weakness = smallest + largest;
+
+				if (verbose)
+				{
+					printf("Found valid sum = %lld, smallest is %lld, largest is %lld, weakness is %lld, sequence is:  ", sum, smallest, largest, weakness);
+					for (BigInt i = firstIndex; i <= secondIndex; ++i)
+					{
+						printf("%lld ", m_numbers[i]);
+					}
+					printf("\n");
+				}
+
+				return weakness;
+			}
+		}
+
+		return -1;
+	}
+
 
 private:
 	BigInt					m_windowSize;
@@ -1384,10 +1501,14 @@ private:
 void RunEncodingError()
 {
 	XMasNumberSeries testSeries(5, "Day9TestInput.txt");
-	printf("First invalid number in test series = %lld\n", testSeries.FindFirstInvalidNumber(true));
+	BigInt firstInvalidNumber = testSeries.FindFirstInvalidNumber(true);
+	printf("First invalid number in test series = %lld\n", firstInvalidNumber);
+	printf("Encryption weakness = %lld\n", testSeries.FindEncryptionWeakness(firstInvalidNumber, true));
 
 	XMasNumberSeries mainSeries(25, "Day9Input.txt");
-	printf("First invalid number in main series = %lld\n", mainSeries.FindFirstInvalidNumber(true));
+	firstInvalidNumber = mainSeries.FindFirstInvalidNumber(true);
+	printf("First invalid number in main series = %lld\n", firstInvalidNumber);
+	printf("Encryption weakness = %lld\n", mainSeries.FindEncryptionWeakness(firstInvalidNumber, false));
 }
 
 
