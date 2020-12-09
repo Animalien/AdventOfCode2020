@@ -1111,6 +1111,127 @@ void RunHandyHaversacks()
 }
 
 
+////////////////////////////
+// Problem 8 - Handheld Halting
+
+enum InstructionType
+{
+	InstructionType_NOP,
+	InstructionType_ACC,
+	InstructionType_JMP,
+};
+
+struct Instruction
+{
+	InstructionType		type;
+	BigInt				arg;
+};
+
+class Program
+{
+public:
+	Program(const char* fileName)
+		: m_nextInstructionIndex(0)
+		, m_accumulator(0)
+	{
+		std::vector<std::string> lines;
+		std::vector<std::string> tokens;
+
+		ReadFileLines(fileName, lines);
+
+		for (BigInt i = 0; i < (BigInt)lines.size(); ++i)
+		{
+			Tokenize(lines[i], tokens, ' ');
+			assert(tokens.size() == 2);
+
+			Instruction newInstruction;
+			if (tokens[0] == "nop")
+				newInstruction.type = InstructionType_NOP;
+			else if (tokens[0] == "acc")
+				newInstruction.type = InstructionType_ACC;
+			else
+			{
+				assert(tokens[0] == "jmp");
+				newInstruction.type = InstructionType_JMP;
+			}
+
+			newInstruction.arg = atoi(tokens[1].c_str());
+
+			m_instructions.push_back(newInstruction);
+		}
+
+		m_instructionRunCounts.resize(m_instructions.size(), false);
+	}
+
+	void ResetExecution()
+	{
+		m_nextInstructionIndex = 0;
+		m_accumulator = 0;
+		std::fill(m_instructionRunCounts.begin(), m_instructionRunCounts.end(), false);
+	}
+
+	BigInt GetAccumulator() const { return m_accumulator; }
+
+	void ExecuteNextInstruction(bool verbose)
+	{
+		const BigInt instructionToExecute = m_nextInstructionIndex;
+		const Instruction& nextInstruction = m_instructions[instructionToExecute];
+		switch (nextInstruction.type)
+		{
+		case InstructionType_NOP:
+		default:
+			assert(nextInstruction.type == InstructionType_NOP);
+			// nothing-doing
+			++m_nextInstructionIndex;
+			if (verbose)
+				printf("%lld: NOP %+lld\n", instructionToExecute, nextInstruction.arg);
+			break;
+		case InstructionType_ACC:
+			m_accumulator += nextInstruction.arg;
+			++m_nextInstructionIndex;
+			if (verbose)
+				printf("%lld: ACC %+lld, %lld = %lld%+lld\n", instructionToExecute, nextInstruction.arg, m_accumulator, m_accumulator - nextInstruction.arg, nextInstruction.arg);
+			break;
+		case InstructionType_JMP:
+			m_nextInstructionIndex += nextInstruction.arg;
+			if (verbose)
+				printf("%lld: JMP %+lld, %lld = %lld%+lld\n", instructionToExecute, nextInstruction.arg, m_nextInstructionIndex, m_nextInstructionIndex - nextInstruction.arg, nextInstruction.arg);
+			break;
+		}
+		++m_instructionRunCounts[instructionToExecute];
+	}
+
+	BigInt HasNextInstructionBeenRunBefore() const { return m_instructionRunCounts[m_nextInstructionIndex] > 0; }
+
+	void ExecuteUntilLoop(bool verbose)
+	{
+		while (!HasNextInstructionBeenRunBefore())
+			ExecuteNextInstruction(verbose);
+	}
+
+
+private:
+	std::vector<Instruction>	m_instructions;
+
+	BigInt						m_nextInstructionIndex;
+	BigInt						m_accumulator;
+	std::vector<BigInt>			m_instructionRunCounts;
+};
+
+void RunHandheldHalting()
+{
+	Program testProgram("Day8TestInput.txt");
+	printf("Test program:\n");
+	testProgram.ExecuteUntilLoop(true);
+	printf("Accumulator = %lld\n", testProgram.GetAccumulator());
+
+	Program program("Day8Input.txt");
+	printf("\nMain program:\n");
+	program.ExecuteUntilLoop(true);
+	printf("Accumulator = %lld\n", program.GetAccumulator());
+}
+
+
 
 ////////////////////////////
 ////////////////////////////
@@ -1151,6 +1272,9 @@ int main(int argc, char** argv)
 		break;
 	case 7:
 		RunHandyHaversacks();
+		break;
+	case 8:
+		RunHandheldHalting();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
