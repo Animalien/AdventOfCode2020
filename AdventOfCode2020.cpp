@@ -1513,6 +1513,92 @@ void RunEncodingError()
 
 
 ////////////////////////////
+// Problem 10 - Adapter Array
+
+void ReadAdapterArray(const char* fileName, std::set<BigInt>& jolts, bool verbose)
+{
+	std::vector<std::string> lines;
+	ReadFileLines(fileName, lines);
+
+	jolts.clear();
+	for (BigInt i = 0; i < (BigInt)lines.size(); ++i)
+	{
+		jolts.insert(atoi(lines[i].c_str()));
+	}
+
+	if (verbose)
+	{
+		printf("Read adapter array from '%s', sorted list = ", fileName);
+		for (auto iter = jolts.cbegin(); iter != jolts.cend(); ++iter)
+		{
+			printf("%lld ", *iter);
+		}
+		printf("\n");
+	}
+}
+
+BigInt CalcProdAdaptor1JoltAnd3JoltGaps(const std::set<BigInt>& jolts, bool verbose)
+{
+	assert(jolts.size() >= 2);
+	assert(*jolts.cbegin() <= 3);
+
+	BigInt num1JoltGaps = 0;
+	BigInt num3JoltGaps = 0;
+
+	BigInt prevJolt = 0;
+	for (auto iter = jolts.cbegin(); iter != jolts.cend(); ++iter)
+	{
+		const BigInt thisJolt = *iter;
+		const BigInt joltGap = thisJolt - prevJolt;
+		assert(joltGap >= 1);
+		assert(joltGap <= 3);
+
+		if (joltGap == 1)
+			++num1JoltGaps;
+		else if (joltGap == 3)
+			++num3JoltGaps;
+
+		if (verbose)
+		{
+			printf("This jolt = %lld, which is a gap %lld from prev jolt %lld\n", thisJolt, joltGap, prevJolt);
+			if (joltGap == 1)
+				printf("Num 1-jolt gaps incremented to %lld\n", num1JoltGaps);
+			else if (joltGap == 3)
+				printf("Num 3-jolt gaps incremented to %lld\n", num1JoltGaps);
+		}
+
+		prevJolt = thisJolt;
+	}
+
+	++num3JoltGaps;
+	if (verbose)
+		printf("Final 3-jolt gap from %lld to %lld\n", prevJolt, prevJolt + 3);
+
+	const BigInt prod = num1JoltGaps * num3JoltGaps;
+	if (verbose)
+		printf("Found %lld 1-jolt gaps and %lld 3-jolt gaps\n", num1JoltGaps, num3JoltGaps);
+
+	return prod;
+}
+
+void RunAdapterArray()
+{
+	std::set<BigInt> testJoltsA;
+	ReadAdapterArray("Day10TestInputA.txt", testJoltsA, true);
+	printf("Test array A, product of 1 jolt and 3 jolt gaps = %lld\n", CalcProdAdaptor1JoltAnd3JoltGaps(testJoltsA, true));
+
+	std::set<BigInt> testJoltsB;
+	ReadAdapterArray("Day10TestInputB.txt", testJoltsB, true);
+	printf("Test array B, product of 1 jolt and 3 jolt gaps = %lld\n", CalcProdAdaptor1JoltAnd3JoltGaps(testJoltsB, true));
+
+	std::set<BigInt> mainJolts;
+	ReadAdapterArray("Day10Input.txt", mainJolts, false);
+	printf("Main array, product of 1 jolt and 3 jolt gaps = %lld\n", CalcProdAdaptor1JoltAnd3JoltGaps(mainJolts, true));
+}
+
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -1557,6 +1643,9 @@ int main(int argc, char** argv)
 		break;
 	case 9:
 		RunEncodingError();
+		break;
+	case 10:
+		RunAdapterArray();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
