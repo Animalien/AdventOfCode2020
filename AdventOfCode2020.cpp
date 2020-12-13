@@ -1732,13 +1732,20 @@ public:
 		for (BigInt i = 1; i < m_numSeatsY; ++i)
 			assert(m_seats[i].length() == m_numSeatsX);
 
+		m_origSeats = m_seats;
+
 		if (verbose)
 			PrintLayout();
 	}
 
+	void Reset()
+	{
+		m_seats = m_origSeats;
+	}
+
 	char GetLocationState(BigInt x, BigInt y) const { return m_seats[y][x]; }
 
-	void StepForwardUntilNothingChanges(bool verbose)
+	void StepForwardUntilNothingChanges(BigInt seeingDistance, BigInt maxSeenOccupied, bool verbose)
 	{
 		if (verbose)
 		{
@@ -1748,7 +1755,7 @@ public:
 		for (;;)
 		{
 			bool somethingChanged = false;
-			StepForward(&somethingChanged);
+			StepForward(seeingDistance, maxSeenOccupied, &somethingChanged);
 
 			if (!somethingChanged)
 			{
@@ -1765,7 +1772,7 @@ public:
 		}
 	}
 
-	void StepForward(bool* pSomethingChanged = nullptr)
+	void StepForward(BigInt seeingDistance, BigInt maxSeenOccupied, bool* pSomethingChanged = nullptr)
 	{
 		std::vector<std::string> newSeats;
 		newSeats.resize(m_numSeatsY);
@@ -1782,7 +1789,7 @@ public:
 				switch (locState)
 				{
 				case 'L':
-					if (CountNeighbors(x, y, '#') <= 0)
+					if (CountOccupiedSeatsSeen(x, y, seeingDistance) <= 0)
 					{
 						row += '#';
 						somethingChanged = true;
@@ -1793,7 +1800,7 @@ public:
 					}
 					break;
 				case '#':
-					if (CountNeighbors(x, y, '#') >= 4)
+					if (CountOccupiedSeatsSeen(x, y, seeingDistance) >= maxSeenOccupied)
 					{
 						row += 'L';
 						somethingChanged = true;
@@ -1835,30 +1842,49 @@ public:
 
 
 private:
-	BigInt CountNeighbors(BigInt x, BigInt y, char neighborType) const
+	BigInt CountOccupiedSeatsSeen(BigInt x, BigInt y, BigInt seeingDistance) const
 	{
 		BigInt count = 0;
 
-		for (BigInt yy = y - 1; yy <= y + 1; ++yy)
-		{
-			if ((yy < 0) || (yy >= m_numSeatsY))
-				continue;
-
-			for (BigInt xx = x - 1; xx <= x + 1; ++xx)
-			{
-				if ((xx < 0) ||
-					(xx >= m_numSeatsX) ||
-					((xx == x) && (yy == y)))
-					continue;
-
-				if (GetLocationState(xx, yy) == neighborType)
-					++count;
-			}
-		}
+		count += CanSeeOccupiedSeatInDirection(x, y, seeingDistance, +1, 0);
+		count += CanSeeOccupiedSeatInDirection(x, y, seeingDistance, +1, +1);
+		count += CanSeeOccupiedSeatInDirection(x, y, seeingDistance,  0, +1);
+		count += CanSeeOccupiedSeatInDirection(x, y, seeingDistance, -1, +1);
+		count += CanSeeOccupiedSeatInDirection(x, y, seeingDistance, -1,  0);
+		count += CanSeeOccupiedSeatInDirection(x, y, seeingDistance, -1, -1);
+		count += CanSeeOccupiedSeatInDirection(x, y, seeingDistance,  0, -1);
+		count += CanSeeOccupiedSeatInDirection(x, y, seeingDistance, +1, -1);
 
 		return count;
 	}
 
+	bool CanSeeOccupiedSeatInDirection(BigInt x, BigInt y, BigInt seeingDistance, BigInt xDir, BigInt yDir) const
+	{
+		assert((xDir == -1) || (xDir == 0) || (xDir == +1));
+		assert((yDir == -1) || (yDir == 0) || (yDir == +1));
+		assert((xDir != 0) || (yDir != 0));
+
+		for (BigInt i=0; (seeingDistance < 0)||(i<seeingDistance); ++i)
+		{
+			x += xDir;
+			y += yDir;
+
+			if ((x < 0) || (x >= m_numSeatsX) || (y < 0) || (y >= m_numSeatsY))
+				return false;
+
+			const char seenSpotType = m_seats[y][x];
+			if (seenSpotType == '#')
+				return true;
+			if (seenSpotType == 'L')
+				return false;
+
+			assert(seenSpotType == '.');
+		}
+
+		return false;
+	}
+
+	std::vector<std::string>	m_origSeats;
 	std::vector<std::string>	m_seats;
 	BigInt						m_numSeatsX;
 	BigInt						m_numSeatsY;
@@ -1867,12 +1893,18 @@ private:
 void RunSeatingSystem()
 {
 	SeatingLayout testLayout("Day11TestInput.txt", true);
-	testLayout.StepForwardUntilNothingChanges(true);
-	printf("For test input, after settling, number of occupied seats = %lld\n", testLayout.CountLocationStatesOfType('#'));
+	testLayout.StepForwardUntilNothingChanges(1, 4, true);
+	printf("For test input, seeing distance of 1 and seeing max occupants 4, after settling, number of occupied seats = %lld\n", testLayout.CountLocationStatesOfType('#'));
+	testLayout.Reset();
+	testLayout.StepForwardUntilNothingChanges(-1, 5, true);
+	printf("For test input, seeing distance of infinity and seeing max occupants 5, after settling, number of occupied seats = %lld\n", testLayout.CountLocationStatesOfType('#'));
 
 	SeatingLayout mainLayout("Day11Input.txt", false);
-	mainLayout.StepForwardUntilNothingChanges(false);
-	printf("For main input, after settling, number of occupied seats = %lld\n", mainLayout.CountLocationStatesOfType('#'));
+	mainLayout.StepForwardUntilNothingChanges(1, 4, false);
+	printf("For main input, seeing distance of 1 and seeing max occupants 4, after settling, number of occupied seats = %lld\n", mainLayout.CountLocationStatesOfType('#'));
+	mainLayout.Reset();
+	mainLayout.StepForwardUntilNothingChanges(-1, 5, false);
+	printf("For main input, seeing distance of infinity and seeing max occupants 5, after settling, number of occupied seats = %lld\n", mainLayout.CountLocationStatesOfType('#'));
 }
 
 
