@@ -18,6 +18,7 @@
 // Numeric
 
 typedef long long BigInt;
+typedef unsigned long long BigUInt;
 
 
 ////////////////////////////
@@ -1537,13 +1538,14 @@ void ReadAdapterArray(const char* fileName, std::set<BigInt>& jolts, bool verbos
 	}
 }
 
-BigInt CalcProdAdaptor1JoltAnd3JoltGaps(const std::set<BigInt>& jolts, bool verbose)
+void CalcAdaptorJoltGaps(const std::set<BigInt>& jolts, BigInt& num1JoltGaps, BigInt& num2JoltGaps, BigInt& num3JoltGaps, bool verbose)
 {
 	assert(jolts.size() >= 2);
 	assert(*jolts.cbegin() <= 3);
 
-	BigInt num1JoltGaps = 0;
-	BigInt num3JoltGaps = 0;
+	num1JoltGaps = 0;
+	num2JoltGaps = 0;
+	num3JoltGaps = 0;
 
 	BigInt prevJolt = 0;
 	for (auto iter = jolts.cbegin(); iter != jolts.cend(); ++iter)
@@ -1563,8 +1565,10 @@ BigInt CalcProdAdaptor1JoltAnd3JoltGaps(const std::set<BigInt>& jolts, bool verb
 			printf("This jolt = %lld, which is a gap %lld from prev jolt %lld\n", thisJolt, joltGap, prevJolt);
 			if (joltGap == 1)
 				printf("Num 1-jolt gaps incremented to %lld\n", num1JoltGaps);
+			else if (joltGap == 2)
+				printf("Num 2-jolt gaps incremented to %lld\n", num2JoltGaps);
 			else if (joltGap == 3)
-				printf("Num 3-jolt gaps incremented to %lld\n", num1JoltGaps);
+				printf("Num 3-jolt gaps incremented to %lld\n", num3JoltGaps);
 		}
 
 		prevJolt = thisJolt;
@@ -1572,13 +1576,121 @@ BigInt CalcProdAdaptor1JoltAnd3JoltGaps(const std::set<BigInt>& jolts, bool verb
 
 	++num3JoltGaps;
 	if (verbose)
-		printf("Final 3-jolt gap from %lld to %lld\n", prevJolt, prevJolt + 3);
+		printf("Final 3-jolt gap from %lld to %lld\nFound %lld 1-jolt gaps, %lld 2-jolt gaps, and %lld 3-jolt gaps\n", prevJolt, prevJolt + 3, num1JoltGaps, num2JoltGaps, num3JoltGaps);
+}
 
-	const BigInt prod = num1JoltGaps * num3JoltGaps;
+BigInt CalcProdAdaptor1JoltAnd3JoltGaps(const std::set<BigInt>& jolts, bool verbose)
+{
+	BigInt num1JoltGaps = 0;
+	BigInt num2JoltGaps = 0;
+	BigInt num3JoltGaps = 0;
+	CalcAdaptorJoltGaps(jolts, num1JoltGaps, num2JoltGaps, num3JoltGaps, verbose);
+
+	return num1JoltGaps * num3JoltGaps;
+}
+
+void IncrementContigAdaptorStretches(std::map<BigInt, BigInt>& contigStretches, BigInt stretchLen, bool verbose)
+{
 	if (verbose)
-		printf("Found %lld 1-jolt gaps and %lld 3-jolt gaps\n", num1JoltGaps, num3JoltGaps);
+		printf("Finished a contig stretch of length %lld\n", stretchLen);
 
-	return prod;
+	auto contigFinder = contigStretches.find(stretchLen);
+	if (contigFinder != contigStretches.end())
+	{
+		++(contigFinder->second);
+		if (verbose)
+			printf("Now there are %lld contig stretches of length %lld\n", contigFinder->second, stretchLen);
+	}
+	else
+	{
+		contigStretches.insert(std::pair<BigInt, BigInt>(stretchLen, 1));
+		if (verbose)
+			printf("Now there is 1 contig stretch of length %lld\n", stretchLen);
+	}
+}
+
+void CalcContigAdaptorStretches(const std::set<BigInt>& jolts, std::map<BigInt, BigInt>& contigStretches, bool verbose)
+{
+	BigInt num1JoltGaps = 0;
+	BigInt num2JoltGaps = 0;
+	BigInt num3JoltGaps = 0;
+	CalcAdaptorJoltGaps(jolts, num1JoltGaps, num2JoltGaps, num3JoltGaps, false);
+
+	assert(num2JoltGaps == 0);
+
+	contigStretches.clear();
+	BigInt currStretchLen = 1;
+
+	BigInt prevJolt = 0;
+	for (auto iter = jolts.cbegin(); iter != jolts.cend(); ++iter)
+	{
+		const BigInt thisJolt = *iter;
+		const BigInt gap = thisJolt - prevJolt;
+
+		if (gap == 1)
+		{
+			++currStretchLen;
+		}
+		else
+		{
+			assert(gap == 3);
+
+			IncrementContigAdaptorStretches(contigStretches, currStretchLen, verbose);
+
+			currStretchLen = 1;
+		}
+
+		prevJolt = thisJolt;
+	}
+	IncrementContigAdaptorStretches(contigStretches, currStretchLen, verbose);
+
+	if (verbose)
+	{
+		printf("Entire list of stretches:  ");
+		for (auto iter = contigStretches.cbegin(); iter != contigStretches.cend(); ++iter)
+			printf("%lldn of %lld  ", iter->second, iter->first);
+		printf("\n");
+	}
+}
+
+BigInt CalcNumWaysToConnectAdaptors(const std::set<BigInt>& jolts, bool verbose)
+{
+	std::map<BigInt, BigInt> contigStretches;
+	CalcContigAdaptorStretches(jolts, contigStretches, verbose);
+
+	BigInt numWays = 1;
+
+	for (auto iter = contigStretches.cbegin(); iter != contigStretches.cend(); ++iter)
+	{
+		if (iter->first < 3)
+			continue;
+
+		BigInt numStretchWays = 1;
+		switch (iter->first)
+		{
+		case 3:
+			numStretchWays = 2;
+			break;
+		case 4:
+			numStretchWays = 4;
+			break;
+		case 5:
+			numStretchWays = 7;
+			break;
+		default:
+			assert(false);
+			break;
+		}
+
+		const BigInt term = (BigInt)pow((double)numStretchWays, (double)iter->second);
+		if (verbose)
+			printf("There are %lld stretches of length %lld;  each one contributes %lld ways;  term is %lld ^ %lld;  numWays = numWays * %lld = %lld * %lld = %lld\n",
+				iter->second, iter->first, numStretchWays, numStretchWays, iter->second, term, numWays, term, numWays * term);
+
+		numWays *= term;
+	}
+
+	return numWays;
 }
 
 void RunAdapterArray()
@@ -1586,14 +1698,17 @@ void RunAdapterArray()
 	std::set<BigInt> testJoltsA;
 	ReadAdapterArray("Day10TestInputA.txt", testJoltsA, true);
 	printf("Test array A, product of 1 jolt and 3 jolt gaps = %lld\n", CalcProdAdaptor1JoltAnd3JoltGaps(testJoltsA, true));
+	printf("Test array A, num ways to connect adaptors = %lld\n", CalcNumWaysToConnectAdaptors(testJoltsA, true));
 
 	std::set<BigInt> testJoltsB;
 	ReadAdapterArray("Day10TestInputB.txt", testJoltsB, true);
 	printf("Test array B, product of 1 jolt and 3 jolt gaps = %lld\n", CalcProdAdaptor1JoltAnd3JoltGaps(testJoltsB, true));
+	printf("Test array B, num ways to connect adaptors = %lld\n", CalcNumWaysToConnectAdaptors(testJoltsB, true));
 
 	std::set<BigInt> mainJolts;
 	ReadAdapterArray("Day10Input.txt", mainJolts, false);
-	printf("Main array, product of 1 jolt and 3 jolt gaps = %lld\n", CalcProdAdaptor1JoltAnd3JoltGaps(mainJolts, true));
+	printf("Main array, product of 1 jolt and 3 jolt gaps = %lld\n", CalcProdAdaptor1JoltAnd3JoltGaps(mainJolts, false));
+	printf("Main array, num ways to connect adaptors = %lld\n", CalcNumWaysToConnectAdaptors(mainJolts, true));
 }
 
 
