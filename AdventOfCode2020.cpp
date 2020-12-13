@@ -1712,6 +1712,169 @@ void RunAdapterArray()
 }
 
 
+////////////////////////////
+// Problem 11 - Seating System
+
+class SeatingLayout
+{
+public:
+	SeatingLayout(const char* fileName, bool verbose)
+		: m_numSeatsX(0)
+		, m_numSeatsY(0)
+	{
+		ReadFileLines(fileName, m_seats);
+
+		if (verbose)
+			printf("Read seating layout from %s:\n", fileName);
+
+		m_numSeatsX = m_seats[0].length();
+		m_numSeatsY = (BigInt)m_seats.size();
+		for (BigInt i = 1; i < m_numSeatsY; ++i)
+			assert(m_seats[i].length() == m_numSeatsX);
+
+		if (verbose)
+			PrintLayout();
+	}
+
+	char GetLocationState(BigInt x, BigInt y) const { return m_seats[y][x]; }
+
+	void StepForwardUntilNothingChanges(bool verbose)
+	{
+		if (verbose)
+		{
+			printf("Initial state:\n");
+			PrintLayout();
+		}
+		for (;;)
+		{
+			bool somethingChanged = false;
+			StepForward(&somethingChanged);
+
+			if (!somethingChanged)
+			{
+				if (verbose)
+					printf("State settled!\n");
+				break;
+			}
+
+			if (verbose)
+			{
+				printf("Next state:\n");
+				PrintLayout();
+			}
+		}
+	}
+
+	void StepForward(bool* pSomethingChanged = nullptr)
+	{
+		std::vector<std::string> newSeats;
+		newSeats.resize(m_numSeatsY);
+
+		bool somethingChanged = false;
+		for (BigInt y = 0; y < m_numSeatsY; ++y)
+		{
+			std::string& row = newSeats[y];
+
+			row.clear();
+			for (BigInt x = 0; x < m_numSeatsX; ++x)
+			{
+				const char locState = GetLocationState(x, y);
+				switch (locState)
+				{
+				case 'L':
+					if (CountNeighbors(x, y, '#') <= 0)
+					{
+						row += '#';
+						somethingChanged = true;
+					}
+					else
+					{
+						row += 'L';
+					}
+					break;
+				case '#':
+					if (CountNeighbors(x, y, '#') >= 4)
+					{
+						row += 'L';
+						somethingChanged = true;
+					}
+					else
+					{
+						row += '#';
+					}
+					break;
+				default:
+					assert(locState == '.');
+					row += '.';
+					break;
+				}
+			}
+		}
+
+		m_seats.swap(newSeats);
+		if (pSomethingChanged)
+			*pSomethingChanged = somethingChanged;
+	}
+
+	void PrintLayout()
+	{
+		for (BigInt i = 0; i < (BigInt)m_seats.size(); ++i)
+			printf("  %s\n", m_seats[i].c_str());
+	}
+
+	BigInt CountLocationStatesOfType(char type) const
+	{
+		BigInt count = 0;
+		for (BigInt y = 0; y < m_numSeatsY; ++y)
+		{
+			const std::string& row = m_seats[y];
+			count += std::count(row.cbegin(), row.cend(), type);
+		}
+		return count;
+	}
+
+
+private:
+	BigInt CountNeighbors(BigInt x, BigInt y, char neighborType) const
+	{
+		BigInt count = 0;
+
+		for (BigInt yy = y - 1; yy <= y + 1; ++yy)
+		{
+			if ((yy < 0) || (yy >= m_numSeatsY))
+				continue;
+
+			for (BigInt xx = x - 1; xx <= x + 1; ++xx)
+			{
+				if ((xx < 0) ||
+					(xx >= m_numSeatsX) ||
+					((xx == x) && (yy == y)))
+					continue;
+
+				if (GetLocationState(xx, yy) == neighborType)
+					++count;
+			}
+		}
+
+		return count;
+	}
+
+	std::vector<std::string>	m_seats;
+	BigInt						m_numSeatsX;
+	BigInt						m_numSeatsY;
+};
+
+void RunSeatingSystem()
+{
+	SeatingLayout testLayout("Day11TestInput.txt", true);
+	testLayout.StepForwardUntilNothingChanges(true);
+	printf("For test input, after settling, number of occupied seats = %lld\n", testLayout.CountLocationStatesOfType('#'));
+
+	SeatingLayout mainLayout("Day11Input.txt", false);
+	mainLayout.StepForwardUntilNothingChanges(false);
+	printf("For main input, after settling, number of occupied seats = %lld\n", mainLayout.CountLocationStatesOfType('#'));
+}
+
 
 ////////////////////////////
 ////////////////////////////
@@ -1761,6 +1924,9 @@ int main(int argc, char** argv)
 		break;
 	case 10:
 		RunAdapterArray();
+		break;
+	case 11:
+		RunSeatingSystem();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
