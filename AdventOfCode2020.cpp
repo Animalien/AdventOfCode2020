@@ -1909,6 +1909,109 @@ void RunSeatingSystem()
 
 
 ////////////////////////////
+// Problem 12 - Rain Risk
+
+void StepRainRiskShip(BigInt& xPos, BigInt& yPos, BigInt& facing, const std::string& command, bool verbose)
+{
+	assert(command.length() >= 2);
+
+	const char commandPrefix = command[0];
+	const BigInt commandArg = atoi(command.c_str() + 1);
+	switch (commandPrefix)
+	{
+	case 'N':
+		yPos -= commandArg;
+		if (verbose)
+			printf("Moved %lld units North\n", commandArg);
+		break;
+	case 'S':
+		yPos += commandArg;
+		if (verbose)
+			printf("Moved %lld units South\n", commandArg);
+		break;
+	case 'E':
+		xPos += commandArg;
+		if (verbose)
+			printf("Moved %lld units East\n", commandArg);
+		break;
+	case 'W':
+		xPos -= commandArg;
+		if (verbose)
+			printf("Moved %lld units West\n", commandArg);
+		break;
+	case 'L':
+		assert((commandArg % 90) == 0);
+		facing = (facing - commandArg + 360) % 360;
+		if (verbose)
+			printf("Rotated %lld degrees to the Left\n", commandArg);
+		break;
+	case 'R':
+		assert((commandArg % 90) == 0);
+		facing = (facing + commandArg) % 360;
+		if (verbose)
+			printf("Rotated %lld degrees to the Right\n", commandArg);
+		break;
+	case 'F':
+		switch (facing)
+		{
+		case 0:
+			yPos -= commandArg;
+			break;
+		case 90:
+			xPos += commandArg;
+			break;
+		case 180:
+			yPos += commandArg;
+			break;
+		case 270:
+			xPos -= commandArg;
+			break;
+		default:
+			assert(false && "Invalid facing");
+			break;
+		}
+		if (verbose)
+			printf("Moved %lld units Forward\n", commandArg);
+		break;
+	default:
+		assert(false && "Invalid command prefix");
+		break;
+	}
+
+	if (verbose)
+		printf("New position is x = %lld, y = %lld, facing = %lld\n", xPos, yPos, facing);
+}
+
+BigInt CalcManhattanDistance(const std::vector<std::string>& lines, bool verbose)
+{
+	BigInt xPos = 0;
+	BigInt yPos = 0;
+	BigInt facing = 90;
+	for (BigInt i = 0; i < (BigInt)lines.size(); ++i)
+	{
+		const std::string& command = lines[i];
+		if (verbose)
+			printf("Received command:  %s\n", command.c_str());
+		StepRainRiskShip(xPos, yPos, facing, command, verbose);
+	}
+
+	return (abs(xPos) + abs(yPos));
+}
+
+void RunRainRisk()
+{
+	std::vector<std::string> testData;
+	ReadFileLines("Day12TestInput.txt", testData);
+	printf("Manhattan distance after running commands in test data = %lld\n", CalcManhattanDistance(testData, true));
+
+	std::vector<std::string> mainData;
+	ReadFileLines("Day12Input.txt", mainData);
+	printf("Manhattan distance after running commands in main data = %lld\n", CalcManhattanDistance(mainData, true));
+}
+
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -1959,6 +2062,9 @@ int main(int argc, char** argv)
 		break;
 	case 11:
 		RunSeatingSystem();
+		break;
+	case 12:
+		RunRainRisk();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
