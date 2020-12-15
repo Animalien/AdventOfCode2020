@@ -2124,6 +2124,95 @@ void RunRainRisk()
 }
 
 
+////////////////////////////
+// Problem 13 - Shuttle Search
+
+void ReadShuttleSearchFile(const char* fileName, BigInt& startTime, std::set<BigInt>& availBuses, bool verbose)
+{
+	std::vector<std::string> lines;
+	ReadFileLines(fileName, lines);
+	assert(lines.size() == 2);
+
+	if (verbose)
+		printf("Reading shuttle search file %s\n", fileName);
+
+	startTime = atoi(lines[0].c_str());
+	if (verbose)
+		printf("Read earliest timestamp = %lld\n", startTime);
+
+	std::vector<std::string> tokens;
+	Tokenize(lines[1], tokens, ',');
+
+	availBuses.clear();
+	if (verbose)
+		printf("Reading available buses:\n");
+	for (auto iter = tokens.cbegin(); iter != tokens.cend(); ++iter)
+	{
+		if (verbose)
+			printf("  Read %s, ", iter->c_str());
+
+		if (*iter == "x")
+		{
+			if (verbose)
+				printf("skipping\n");
+			continue;
+		}
+
+		const BigInt oneBus = atoi(iter->c_str());
+		availBuses.insert(oneBus);
+		if (verbose)
+			printf("bus %lld added\n", oneBus);
+	}
+
+	if (verbose)
+	{
+		printf("Full sorted bus list:  ");
+		for (auto iter = availBuses.cbegin(); iter != availBuses.cend(); ++iter)
+			printf("%lld ", *iter);
+		printf("\n");
+	}
+}
+
+BigInt CalcShuttleProdIDAndWaitTime(BigInt startTime, const std::set<BigInt>& availBuses, bool verbose)
+{
+	BigInt currTime = startTime;
+
+	for (;;)
+	{
+		for (auto iter = availBuses.cbegin(); iter != availBuses.cend(); ++iter)
+		{
+			const BigInt currBus = *iter;
+			const BigInt timeMod = currTime % currBus;
+			if (timeMod == 0)
+			{
+				const BigInt waitTime = currTime - startTime;
+				if (verbose)
+					printf("Found bus id %lld departing at time %lld (wait time = %lld)\n", currBus, currTime, waitTime);
+				return currBus * waitTime;
+			}
+
+			if (verbose)
+				printf("Bus id %lld does not depart at time %lld (time mod == %lld), skipping...\n", currBus, currTime, timeMod);
+		}
+
+		++currTime;
+	}
+}
+
+void RunShuttleSearch()
+{
+	BigInt testStartTime = 0;
+	std::set<BigInt> testAvailBuses;
+	ReadShuttleSearchFile("Day13TestInput.txt", testStartTime, testAvailBuses, true);
+	printf("With test data, prod of shuttle ID of earliest departing bus and wait time = %lld\n", CalcShuttleProdIDAndWaitTime(testStartTime, testAvailBuses, true));
+
+	BigInt mainStartTime = 0;
+	std::set<BigInt> mainAvailBuses;
+	ReadShuttleSearchFile("Day13Input.txt", mainStartTime, mainAvailBuses, true);
+	printf("With main data, prod of shuttle ID of earliest departing bus and wait time = %lld\n", CalcShuttleProdIDAndWaitTime(mainStartTime, mainAvailBuses, true));
+}
+
+
 
 ////////////////////////////
 ////////////////////////////
@@ -2179,6 +2268,9 @@ int main(int argc, char** argv)
 		break;
 	case 12:
 		RunRainRisk();
+		break;
+	case 13:
+		RunShuttleSearch();
 		break;
 	default:
 		printf("'%s' is not a valid problem number!\n\n", problemArg);
