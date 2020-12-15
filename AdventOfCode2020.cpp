@@ -1998,15 +1998,129 @@ BigInt CalcManhattanDistance(const std::vector<std::string>& lines, bool verbose
 	return (abs(xPos) + abs(yPos));
 }
 
+void StepRainRiskShipWithWaypoint(BigInt& xPos, BigInt& yPos, BigInt& waypointXPos, BigInt& waypointYPos, const std::string& command, bool verbose)
+{
+	assert(command.length() >= 2);
+
+	const char commandPrefix = command[0];
+	const BigInt commandArg = atoi(command.c_str() + 1);
+	switch (commandPrefix)
+	{
+	case 'N':
+		waypointYPos -= commandArg;
+		if (verbose)
+			printf("Moved waypoint %lld units North\n", commandArg);
+		break;
+	case 'S':
+		waypointYPos += commandArg;
+		if (verbose)
+			printf("Moved waypoint %lld units South\n", commandArg);
+		break;
+	case 'E':
+		waypointXPos += commandArg;
+		if (verbose)
+			printf("Moved waypoint %lld units East\n", commandArg);
+		break;
+	case 'W':
+		waypointXPos -= commandArg;
+		if (verbose)
+			printf("Moved waypoint %lld units West\n", commandArg);
+		break;
+	case 'L':
+		assert((commandArg % 90) == 0);
+		switch (commandArg)
+		{
+		case 0:
+			assert(false && "0 rotation not expected!");
+			break;
+		case 90:
+			std::swap(waypointXPos, waypointYPos);
+			waypointYPos = -waypointYPos;
+			break;
+		case 180:
+			waypointXPos = -waypointXPos;
+			waypointYPos = -waypointYPos;
+			break;
+		case 270:
+			std::swap(waypointXPos, waypointYPos);
+			waypointXPos = -waypointXPos;
+			break;
+		default:
+			assert(false && "Invalid facing");
+			break;
+		}
+		if (verbose)
+			printf("Rotated waypoint %lld degrees to the Left\n", commandArg);
+		break;
+	case 'R':
+		assert((commandArg % 90) == 0);
+		switch (commandArg)
+		{
+		case 0:
+			assert(false && "0 rotation not expected!");
+			break;
+		case 90:
+			std::swap(waypointXPos, waypointYPos);
+			waypointXPos = -waypointXPos;
+			break;
+		case 180:
+			waypointXPos = -waypointXPos;
+			waypointYPos = -waypointYPos;
+			break;
+		case 270:
+			std::swap(waypointXPos, waypointYPos);
+			waypointYPos = -waypointYPos;
+			break;
+		default:
+			assert(false && "Invalid facing");
+			break;
+		}
+		if (verbose)
+			printf("Rotated waypoint %lld degrees to the Right\n", commandArg);
+		break;
+	case 'F':
+		xPos += (waypointXPos * commandArg);
+		yPos += (waypointYPos * commandArg);
+		if (verbose)
+			printf("Moved %lld times Forward toward the waypoint:  xStep = %lld * %lld = %lld, yStep = %lld * %lld = %lld,\n", commandArg, waypointXPos, commandArg, waypointXPos * commandArg, waypointYPos, commandArg, waypointYPos * commandArg);
+		break;
+	default:
+		assert(false && "Invalid command prefix");
+		break;
+	}
+
+	if (verbose)
+		printf("New position is x = %lld, y = %lld; waypoint position is x = %lld, y = %lld\n", xPos, yPos, waypointXPos, waypointYPos);
+}
+
+BigInt CalcManhattanDistanceWithWaypoint(const std::vector<std::string>& lines, bool verbose)
+{
+	BigInt xPos = 0;
+	BigInt yPos = 0;
+	BigInt waypointXPos = 10;
+	BigInt waypointYPos = -1;
+	for (BigInt i = 0; i < (BigInt)lines.size(); ++i)
+	{
+		const std::string& command = lines[i];
+		if (verbose)
+			printf("Received command:  %s\n", command.c_str());
+		StepRainRiskShipWithWaypoint(xPos, yPos, waypointXPos, waypointYPos, command, verbose);
+	}
+
+	return (abs(xPos) + abs(yPos));
+}
+
 void RunRainRisk()
 {
 	std::vector<std::string> testData;
 	ReadFileLines("Day12TestInput.txt", testData);
 	printf("Manhattan distance after running commands in test data = %lld\n", CalcManhattanDistance(testData, true));
+	printf("Manhattan distance after running commands with waypoint in test data = %lld\n", CalcManhattanDistanceWithWaypoint(testData, true));
 
 	std::vector<std::string> mainData;
 	ReadFileLines("Day12Input.txt", mainData);
-	printf("Manhattan distance after running commands in main data = %lld\n", CalcManhattanDistance(mainData, true));
+	printf("Manhattan distance after running commands in main data = %lld\n", CalcManhattanDistance(mainData, false));
+	printf("Manhattan distance after running commands with waypoint in main data = %lld\n", CalcManhattanDistanceWithWaypoint(mainData, false));
 }
 
 
