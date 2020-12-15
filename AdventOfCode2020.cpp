@@ -2127,7 +2127,44 @@ void RunRainRisk()
 ////////////////////////////
 // Problem 13 - Shuttle Search
 
-void ReadShuttleSearchFile(const char* fileName, BigInt& startTime, std::set<BigInt>& availBuses, bool verbose)
+void BuildShuttleAvailBusList(const std::string& busesLine, std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
+{
+	std::vector<std::string> tokens;
+	Tokenize(busesLine, tokens, ',');
+
+	availBuses.clear();
+	if (verbose)
+		printf("Reading available buses:\n");
+	for (BigInt tokenIndex = 0; tokenIndex < (BigInt)tokens.size(); ++tokenIndex)
+	{
+		const std::string& busToken = tokens[tokenIndex];
+
+		if (verbose)
+			printf("  Read %s, ", busToken.c_str());
+
+		if (busToken == "x")
+		{
+			if (verbose)
+				printf("skipping\n");
+			continue;
+		}
+
+		const BigInt oneBus = atoi(busToken.c_str());
+		availBuses.push_back(std::pair<BigInt, BigInt>(oneBus, tokenIndex));
+		if (verbose)
+			printf("bus %lld added, with index = %lld\n", oneBus, tokenIndex);
+	}
+
+	if (verbose)
+	{
+		printf("Full bus list:  ");
+		for (auto iter = availBuses.cbegin(); iter != availBuses.cend(); ++iter)
+			printf("%lld (at %lld) ", iter->first, iter->second);
+		printf("\n");
+	}
+}
+
+void ReadShuttleSearchFile(const char* fileName, BigInt& startTime, std::vector<std::pair<BigInt,BigInt>>& availBuses, bool verbose)
 {
 	std::vector<std::string> lines;
 	ReadFileLines(fileName, lines);
@@ -2140,40 +2177,10 @@ void ReadShuttleSearchFile(const char* fileName, BigInt& startTime, std::set<Big
 	if (verbose)
 		printf("Read earliest timestamp = %lld\n", startTime);
 
-	std::vector<std::string> tokens;
-	Tokenize(lines[1], tokens, ',');
-
-	availBuses.clear();
-	if (verbose)
-		printf("Reading available buses:\n");
-	for (auto iter = tokens.cbegin(); iter != tokens.cend(); ++iter)
-	{
-		if (verbose)
-			printf("  Read %s, ", iter->c_str());
-
-		if (*iter == "x")
-		{
-			if (verbose)
-				printf("skipping\n");
-			continue;
-		}
-
-		const BigInt oneBus = atoi(iter->c_str());
-		availBuses.insert(oneBus);
-		if (verbose)
-			printf("bus %lld added\n", oneBus);
-	}
-
-	if (verbose)
-	{
-		printf("Full sorted bus list:  ");
-		for (auto iter = availBuses.cbegin(); iter != availBuses.cend(); ++iter)
-			printf("%lld ", *iter);
-		printf("\n");
-	}
+	BuildShuttleAvailBusList(lines[1], availBuses, verbose);
 }
 
-BigInt CalcShuttleProdIDAndWaitTime(BigInt startTime, const std::set<BigInt>& availBuses, bool verbose)
+BigInt CalcShuttleProdIDAndWaitTime(BigInt startTime, const std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
 {
 	BigInt currTime = startTime;
 
@@ -2181,7 +2188,7 @@ BigInt CalcShuttleProdIDAndWaitTime(BigInt startTime, const std::set<BigInt>& av
 	{
 		for (auto iter = availBuses.cbegin(); iter != availBuses.cend(); ++iter)
 		{
-			const BigInt currBus = *iter;
+			const BigInt currBus = iter->first;
 			const BigInt timeMod = currTime % currBus;
 			if (timeMod == 0)
 			{
@@ -2199,17 +2206,78 @@ BigInt CalcShuttleProdIDAndWaitTime(BigInt startTime, const std::set<BigInt>& av
 	}
 }
 
+BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
+{
+	BigInt currTime = 0;
+
+	for (;;)
+	{
+		if (verbose)
+			printf("Testing time stamp %lld\n", currTime);
+
+		bool currTimeIsGood = true;
+		for (auto iter = availBuses.cbegin(); iter != availBuses.cend(); ++iter)
+		{
+			const BigInt currBus = iter->first;
+			const BigInt currIndex = iter->second;
+
+			const BigInt timeMod = (currTime + currIndex) % currBus;
+			if (timeMod != 0)
+			{
+				currTimeIsGood = false;
+				if (verbose)
+					printf("  Curr bus %lld, at index %lld, has bad timeMod %lld, rejecting this time...\n", currBus, currIndex, timeMod);
+				break;
+			}
+			else
+			{
+				if (verbose)
+					printf("  Curr bus %lld, at index %lld, has GOOD timeMod!\n", currBus, currIndex);
+			}
+		}
+
+		if (currTimeIsGood)
+		{
+			if (verbose)
+				printf("  Found good currTime = %lld\n", currTime);
+			return currTime;
+		}
+
+		++currTime;
+	}
+}
+
+BigInt CalcEarliestShuttleTime(const char* busLine, bool verbose)
+{
+	std::vector<std::pair<BigInt, BigInt>> availBuses;
+	BuildShuttleAvailBusList(busLine, availBuses, verbose);
+	return CalcEarliestShuttleTime(availBuses, verbose);
+}
+
+void TestInlineEarliestShuttleCase(const char* busLine, bool verbose)
+{
+	printf("With inline data '%s', earliest possible timestamp = %lld\n", busLine, CalcEarliestShuttleTime(busLine, verbose));
+}
+
 void RunShuttleSearch()
 {
 	BigInt testStartTime = 0;
-	std::set<BigInt> testAvailBuses;
-	ReadShuttleSearchFile("Day13TestInput.txt", testStartTime, testAvailBuses, true);
-	printf("With test data, prod of shuttle ID of earliest departing bus and wait time = %lld\n", CalcShuttleProdIDAndWaitTime(testStartTime, testAvailBuses, true));
+	std::vector<std::pair<BigInt, BigInt>> testAvailBuses;
+	ReadShuttleSearchFile("Day13TestInput.txt", testStartTime, testAvailBuses, false);
+	printf("With test data, prod of shuttle ID of earliest departing bus and wait time = %lld\n", CalcShuttleProdIDAndWaitTime(testStartTime, testAvailBuses, false));
 
 	BigInt mainStartTime = 0;
-	std::set<BigInt> mainAvailBuses;
-	ReadShuttleSearchFile("Day13Input.txt", mainStartTime, mainAvailBuses, true);
-	printf("With main data, prod of shuttle ID of earliest departing bus and wait time = %lld\n", CalcShuttleProdIDAndWaitTime(mainStartTime, mainAvailBuses, true));
+	std::vector<std::pair<BigInt, BigInt>> mainAvailBuses;
+	ReadShuttleSearchFile("Day13Input.txt", mainStartTime, mainAvailBuses, false);
+	printf("With main data, prod of shuttle ID of earliest departing bus and wait time = %lld\n", CalcShuttleProdIDAndWaitTime(mainStartTime, mainAvailBuses, false));
+
+	printf("With test data, earliest possible timestamp = %lld\n", CalcEarliestShuttleTime(testAvailBuses, false));
+	TestInlineEarliestShuttleCase("17,x,13,19", false);
+	TestInlineEarliestShuttleCase("67,7,59,61", false);
+	TestInlineEarliestShuttleCase("67,x,7,59,61", false);
+	TestInlineEarliestShuttleCase("67,7,x,59,61", false);
+	TestInlineEarliestShuttleCase("1789,37,47,1889", false);
+	printf("With main data, earliest possible timestamp = %lld\n", CalcEarliestShuttleTime(mainAvailBuses, false));
 }
 
 
