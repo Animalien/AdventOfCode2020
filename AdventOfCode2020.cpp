@@ -2209,6 +2209,21 @@ BigInt CalcShuttleProdIDAndWaitTime(BigInt startTime, const std::vector<std::pai
 BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
 {
 	BigInt currTime = 0;
+	BigInt timeStep = 0;
+
+	for (auto iter = availBuses.cbegin(); iter != availBuses.cend(); ++iter)
+	{
+		if (iter->first > timeStep)
+		{
+			timeStep = iter->first;
+			currTime = timeStep - iter->second;
+		}
+	}
+
+	while (currTime < 0)
+	{
+		currTime += timeStep;
+	}
 
 	for (;;)
 	{
@@ -2243,7 +2258,7 @@ BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& ava
 			return currTime;
 		}
 
-		++currTime;
+		currTime += timeStep;
 	}
 }
 
