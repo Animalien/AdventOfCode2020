@@ -2206,7 +2206,7 @@ BigInt CalcShuttleProdIDAndWaitTime(BigInt startTime, const std::vector<std::pai
 	}
 }
 
-BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
+BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose, BigInt minTime = 0)
 {
 	BigInt currTime = 0;
 	BigInt timeStep = 0;
@@ -2216,7 +2216,20 @@ BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& ava
 		if (iter->first > timeStep)
 		{
 			timeStep = iter->first;
-			currTime = timeStep - iter->second;
+			if (minTime > 0)
+			{
+				currTime = minTime - iter->second;
+
+				const BigInt mod = minTime % iter->first;
+				if (mod > 0)
+				{
+					currTime += (iter->first - mod);
+				}
+			}
+			else
+			{
+				currTime = timeStep - iter->second;
+			}
 		}
 	}
 
@@ -2224,6 +2237,8 @@ BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& ava
 	{
 		currTime += timeStep;
 	}
+
+	std::vector<std::pair<BigInt,BigInt>> times;
 
 	for (;;)
 	{
@@ -2292,7 +2307,7 @@ void RunShuttleSearch()
 	TestInlineEarliestShuttleCase("67,x,7,59,61", false);
 	TestInlineEarliestShuttleCase("67,7,x,59,61", false);
 	TestInlineEarliestShuttleCase("1789,37,47,1889", false);
-	printf("With main data, earliest possible timestamp = %lld\n", CalcEarliestShuttleTime(mainAvailBuses, false));
+	printf("With main data, earliest possible timestamp = %lld\n", CalcEarliestShuttleTime(mainAvailBuses, false, 100000000000001L));
 }
 
 
