@@ -1,6 +1,7 @@
 // Hi, this is my AdventOfCode 2020 stuff
 
 #include <assert.h>
+#include <limits.h>
 #include <map>
 #include <set>
 #include <sstream>
@@ -18,7 +19,160 @@
 // Numeric
 
 typedef long long BigInt;
+const BigInt MAX_BIG_INT = LLONG_MAX;
+
 typedef unsigned long long BigUInt;
+const BigInt MAX_BIG_UINT = ULLONG_MAX;
+
+
+////////////////////////////
+// Factorization
+
+class Factorization : public std::map<BigInt, BigInt>
+{
+public:
+	Factorization() : std::map<BigInt, BigInt>() { }
+
+	bool IsPrime() const
+	{
+		return ((size() == 1) && (begin()->second == 1));
+	}
+
+	void Absorb(const Factorization& other)
+	{
+		for (auto iter = other.begin(); iter != other.end(); ++iter)
+		{
+			Absorb(iter->first, iter->second);
+		}
+	}
+
+	BigInt CalcProduct() const
+	{
+		BigInt product = 1;
+		for (auto iter = begin(); iter != end(); ++iter)
+		{
+			for (BigInt i = 0; i < iter->second; ++i)
+			{
+				product *= iter->first;
+			}
+		}
+		return product;
+	}
+
+	void PrintFactors() const
+	{
+		for (auto iter = begin(); iter != end(); ++iter)
+		{
+			printf("(%lldn of %lld) ", iter->second, iter->first);
+		}
+	}
+
+	BigInt CalcNumDivisors() const
+	{
+		if (IsPrime())
+		{
+			// if prime, then number of divisors is simply:  1, and itself
+			return 2;
+		}
+
+		BigInt numDivisors = 1;
+		// the number of divisors will be the numbers of combinations of prime factors.
+		// in a given divisor, each prime factor can be included from 0 to N times, where
+		// N is the number of times that prime factor exists in the original number.
+		// (the divisor with ZERO of any prime factors included, is the divisor 1, which every number has.)
+		for (auto iter = begin(); iter != end(); ++iter)
+		{
+			numDivisors *= (iter->second + 1);
+		}
+		// add 1 more for the original number, being one of its own divisors
+		numDivisors += 1;
+
+		return numDivisors;
+	}
+
+private:
+	void Absorb(BigInt number, BigInt numFactors)
+	{
+		auto iter = find(number);
+		if (iter != end())
+		{
+			iter->second = std::max(iter->second, numFactors);
+		}
+		else
+		{
+			insert(value_type(number, numFactors));
+		}
+	}
+};
+
+class FactorizationCache : public std::map<BigInt, Factorization>
+{
+public:
+	FactorizationCache() : std::map<BigInt, Factorization>() { }
+
+	void PopulateCache(BigInt num)
+	{
+		Factorize(num * 2);
+	}
+
+	const Factorization& Factorize(BigInt num)
+	{
+		iterator fiter = find(num);
+		if (fiter == end())
+		{
+			fiter = NewFactorize(num);
+		}
+
+		return fiter->second;
+	}
+
+private:
+	iterator NewFactorize(BigInt num)
+	{
+		auto newValue = insert(value_type(num, Factorization()));
+		iterator newIter = newValue.first;
+		Factorization& newFactorization = newIter->second;
+
+		const BigInt halfNum = num / 2;
+		BigInt prodRemaining = num;
+		for (BigInt i = 2; i <= halfNum; ++i)
+		{
+			const Factorization& f = Factorize(i);
+			if (f.IsPrime())
+			{
+				// i is prime, so see how many i factors fit into this number
+				BigInt numFactors = 0;
+				for (;;)
+				{
+					const lldiv_t divRem = lldiv(prodRemaining, i);
+					if (divRem.rem != 0)
+					{
+						break;
+					}
+					++numFactors;
+					prodRemaining = divRem.quot;
+				}
+				if (numFactors > 0)
+				{
+					newFactorization.emplace(i, numFactors);
+				}
+			}
+
+			if (prodRemaining == 1)
+			{
+				break;
+			}
+		}
+		if (newFactorization.empty())
+		{
+			newFactorization.emplace(num, 1);
+		}
+
+		return newIter;
+	}
+};
+
+static FactorizationCache s_factorizationCache;
 
 
 ////////////////////////////
@@ -2238,8 +2392,6 @@ BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& ava
 		currTime += timeStep;
 	}
 
-	std::vector<std::pair<BigInt,BigInt>> times;
-
 	for (;;)
 	{
 		if (verbose)
@@ -2277,11 +2429,97 @@ BigInt CalcEarliestShuttleTime(const std::vector<std::pair<BigInt, BigInt>>& ava
 	}
 }
 
+void IncrementSingleShuttleOffset(BigInt& offset, BigInt thisNum, BigInt increment)
+{
+	offset += increment;
+
+	const lldiv_t div = lldiv(offset, thisNum);
+	offset = div.rem;
+}
+
+void IncrementShuttleOffsets(const std::vector<std::pair<BigInt, BigInt>>& availBuses, std::vector<BigInt>& offsets, BigInt& grandTotalAdded, BigInt focusIndex, BigInt increment, bool verbose)
+{
+	const BigInt focusNum = availBuses[focusIndex].first;
+	BigInt& focusOffset = offsets[focusIndex];
+
+	// get the focused index synced to 0
+
+	BigInt added = 0;
+	while (focusOffset > 0)
+	{
+		IncrementSingleShuttleOffset(focusOffset, focusNum, increment);
+		added += increment;
+	}
+
+	// step the previous offsets, asserting they are still 0 (synced)
+
+	for (BigInt i = 0; i < focusIndex; ++i)
+	{
+		IncrementSingleShuttleOffset(offsets[i], availBuses[i].first, added);
+		assert(offsets[i] == 0);
+	}
+
+	// step the remaining offsets (which may be and probably are still unsynced)
+
+	for (BigInt i = focusIndex + 1; i < (BigInt)availBuses.size(); ++i)
+	{
+		IncrementSingleShuttleOffset(offsets[i], availBuses[i].first, added);
+	}
+
+	grandTotalAdded += added;
+}
+
+BigInt CalcEarliestShuttleTime2(const std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
+{
+	std::vector<BigInt> offsets;
+	offsets.reserve(availBuses.size());
+
+	if (verbose)
+		printf("Avail buses:\n");
+
+	for (auto iter = availBuses.cbegin(); iter != availBuses.cend(); ++iter)
+	{
+		const BigInt thisNum = iter->first;
+		const BigInt index = iter->second;
+
+		if (verbose)
+			printf("  Bus id %lld (%s), at index %lld, ", thisNum, s_factorizationCache.Factorize(thisNum).IsPrime() ? "PRIME" : "not prime", index);
+
+		BigInt offset = -index;
+		while (offset < 0)
+			offset += thisNum;
+
+		const BigInt timeBeforeNextSync = (offset == 0) ? 0 : (thisNum - offset);
+
+		if (verbose)
+			printf("position at time T = %lld, time before next sync = %lld\n", offset, timeBeforeNextSync);
+
+		offsets.push_back(offset);
+	}
+
+	BigInt grandTotalAdded = 0;
+
+	BigInt runningProduct = availBuses[0].first;
+	for (BigInt i=1; i<(BigInt)availBuses.size(); ++i)
+	{
+		IncrementShuttleOffsets(availBuses, offsets, grandTotalAdded, i, runningProduct, verbose);
+
+		runningProduct *= availBuses[i].first;
+	}
+
+	const BigInt earliestShuttleTime = runningProduct - grandTotalAdded;
+
+	if (verbose)
+		printf("Grand total added = %lld, grand product = %lld, difference = %lld\n", grandTotalAdded, runningProduct, earliestShuttleTime);
+
+	return earliestShuttleTime;
+}
+
 BigInt CalcEarliestShuttleTime(const char* busLine, bool verbose)
 {
 	std::vector<std::pair<BigInt, BigInt>> availBuses;
 	BuildShuttleAvailBusList(busLine, availBuses, verbose);
-	return CalcEarliestShuttleTime(availBuses, verbose);
+	return CalcEarliestShuttleTime2(availBuses, verbose);
 }
 
 void TestInlineEarliestShuttleCase(const char* busLine, bool verbose)
@@ -2301,13 +2539,15 @@ void RunShuttleSearch()
 	ReadShuttleSearchFile("Day13Input.txt", mainStartTime, mainAvailBuses, false);
 	printf("With main data, prod of shuttle ID of earliest departing bus and wait time = %lld\n", CalcShuttleProdIDAndWaitTime(mainStartTime, mainAvailBuses, false));
 
-	printf("With test data, earliest possible timestamp = %lld\n", CalcEarliestShuttleTime(testAvailBuses, false));
+	printf("With test data, earliest possible timestamp = %lld\n", CalcEarliestShuttleTime2(testAvailBuses, false));
 	TestInlineEarliestShuttleCase("17,x,13,19", false);
 	TestInlineEarliestShuttleCase("67,7,59,61", false);
 	TestInlineEarliestShuttleCase("67,x,7,59,61", false);
 	TestInlineEarliestShuttleCase("67,7,x,59,61", false);
 	TestInlineEarliestShuttleCase("1789,37,47,1889", false);
-	printf("With main data, earliest possible timestamp = %lld\n", CalcEarliestShuttleTime(mainAvailBuses, false, 100000000000001L));
+
+	printf("\n\n\n");
+	printf("With main data, earliest possible timestamp = %lld\n", CalcEarliestShuttleTime2(mainAvailBuses, true));
 }
 
 
