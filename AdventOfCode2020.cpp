@@ -178,7 +178,7 @@ static FactorizationCache s_factorizationCache;
 ////////////////////////////
 // Strings
 
-static const char* fileNameBase = "..\\Repo\\AdventOfCode2020\\Input\\";
+static const char* fileNameBase = "..\\Input\\";
 
 void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
 {
