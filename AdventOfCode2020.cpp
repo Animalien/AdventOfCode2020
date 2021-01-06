@@ -2706,12 +2706,7 @@ void IterateGenerateDockingStompValueMaskList(
     const BigInt nextBitIndexIndex = bitIndexIndex + 1;
 
     IterateGenerateDockingStompValueMaskList(
-        stompMask,
-        origStompValueMask,
-        stompValueMaskSoFar,
-        nextBitIndexIndex,
-        floatingBitIndexList,
-        stompValueMaskList);
+        stompMask, origStompValueMask, stompValueMaskSoFar, nextBitIndexIndex, floatingBitIndexList, stompValueMaskList);
     IterateGenerateDockingStompValueMaskList(
         stompMask,
         origStompValueMask,
@@ -2737,7 +2732,13 @@ BigInt CalcStompMaskedValue(BigInt stompMask, BigInt stompValueMask, BigInt orig
 }
 
 void WriteDockingDataValue(
-    DockingDataMemory& memory, BigInt stompMask, const BigIntList& stompValueMaskList, BigInt location, BigInt value, bool version2, bool verbose)
+    DockingDataMemory& memory,
+    BigInt stompMask,
+    const BigIntList& stompValueMaskList,
+    BigInt location,
+    BigInt value,
+    bool version2,
+    bool verbose)
 {
     for (BigInt thisStompValueMask: stompValueMaskList)
     {
@@ -2910,6 +2911,85 @@ void RunDockingData()
 
 
 ////////////////////////////
+// Problem 15 - Rambunctious Recitation
+
+void ProgressRambunctiousList(BigIntList& numberList, bool verbose)
+{
+    const BigInt lastNumber = numberList.back();
+
+    if (verbose)
+        printf("  Last number was %lld,", lastNumber);
+
+    const BigInt lastNumberIndex = (BigInt)numberList.size() - 1;
+
+    bool foundNumber = false;
+    BigInt newNumber = 0;
+    for (BigInt i = lastNumberIndex - 1; i >= 0; --i)
+    {
+        if (numberList[i] == lastNumber)
+        {
+            foundNumber = true;
+            newNumber = lastNumberIndex - i;
+
+            if (verbose)
+                printf(
+                    " which was found previously at index %lld, so new number = last index - prev index = %lld - %lld = %lld\n",
+                    i,
+                    lastNumberIndex,
+                    i,
+                    newNumber);
+
+            break;
+        }
+    }
+
+    if (!foundNumber && verbose)
+        printf(" which was not found, so new number = 0\n");
+
+    numberList.push_back(newNumber);
+}
+
+BigInt CalcNthRambunctiousNumber(BigIntList& numberList, BigInt n, bool verbose)
+{
+    assert((BigInt)numberList.size() < n);
+
+    while ((BigInt)numberList.size() < n)
+        ProgressRambunctiousList(numberList, verbose);
+
+    assert((BigInt)numberList.size() == n);
+
+    return numberList.back();
+}
+
+void CalcAndPrintNthRambunctiousNumber(std::initializer_list<BigInt> startList, BigInt n, bool verbose)
+{
+    BigIntList numberList;
+
+    printf("Given list ");
+    for (const BigInt number: startList)
+    {
+        numberList.push_back(number);
+        printf("%lld,", number);
+    }
+    printf(" the %lldth number is %lld\n", n, CalcNthRambunctiousNumber(numberList, n, verbose));
+}
+
+void RunRambunctiousRecitation()
+{
+    CalcAndPrintNthRambunctiousNumber({ 0, 3, 6 }, 2020, true);
+
+    CalcAndPrintNthRambunctiousNumber({ 1, 3, 2 }, 2020, false);
+    CalcAndPrintNthRambunctiousNumber({ 2, 1, 3 }, 2020, false);
+    CalcAndPrintNthRambunctiousNumber({ 1, 2, 3 }, 2020, false);
+    CalcAndPrintNthRambunctiousNumber({ 2, 3, 1 }, 2020, false);
+    CalcAndPrintNthRambunctiousNumber({ 3, 2, 1 }, 2020, false);
+    CalcAndPrintNthRambunctiousNumber({ 3, 1, 2 }, 2020, false);
+
+    CalcAndPrintNthRambunctiousNumber({ 15, 12, 0, 14, 3, 1 }, 2020, false);
+}
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -2969,6 +3049,9 @@ int main(int argc, char** argv)
             break;
         case 14:
             RunDockingData();
+            break;
+        case 15:
+            RunRambunctiousRecitation();
             break;
         default:
             printf("'%s' is not a valid problem number!\n\n", problemArg);
