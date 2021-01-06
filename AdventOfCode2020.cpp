@@ -19,7 +19,10 @@
 // Numeric
 
 typedef long long BigInt;
+typedef std::initializer_list<BigInt> BigIntInitList;
 typedef std::vector<BigInt> BigIntList;
+typedef std::map<BigInt, BigInt> BigIntMap;
+
 typedef unsigned long long BigUInt;
 
 const BigInt MAX_BIG_INT = LLONG_MAX;
@@ -29,10 +32,10 @@ const BigInt MAX_BIG_UINT = ULLONG_MAX;
 ////////////////////////////
 // Factorization
 
-class Factorization : public std::map<BigInt, BigInt>
+class Factorization : public BigIntMap
 {
 public:
-    Factorization() : std::map<BigInt, BigInt>() {}
+    Factorization() : BigIntMap() {}
 
     bool IsPrime() const { return ((size() == 1) && (begin()->second == 1)); }
 
@@ -1794,7 +1797,7 @@ BigInt CalcProdAdaptor1JoltAnd3JoltGaps(const std::set<BigInt>& jolts, bool verb
     return num1JoltGaps * num3JoltGaps;
 }
 
-void IncrementContigAdaptorStretches(std::map<BigInt, BigInt>& contigStretches, BigInt stretchLen, bool verbose)
+void IncrementContigAdaptorStretches(BigIntMap& contigStretches, BigInt stretchLen, bool verbose)
 {
     if (verbose)
         printf("Finished a contig stretch of length %lld\n", stretchLen);
@@ -1814,7 +1817,7 @@ void IncrementContigAdaptorStretches(std::map<BigInt, BigInt>& contigStretches, 
     }
 }
 
-void CalcContigAdaptorStretches(const std::set<BigInt>& jolts, std::map<BigInt, BigInt>& contigStretches, bool verbose)
+void CalcContigAdaptorStretches(const std::set<BigInt>& jolts, BigIntMap& contigStretches, bool verbose)
 {
     BigInt num1JoltGaps = 0;
     BigInt num2JoltGaps = 0;
@@ -1860,7 +1863,7 @@ void CalcContigAdaptorStretches(const std::set<BigInt>& jolts, std::map<BigInt, 
 
 BigInt CalcNumWaysToConnectAdaptors(const std::set<BigInt>& jolts, bool verbose)
 {
-    std::map<BigInt, BigInt> contigStretches;
+    BigIntMap contigStretches;
     CalcContigAdaptorStretches(jolts, contigStretches, verbose);
 
     BigInt numWays = 1;
@@ -2658,7 +2661,7 @@ void RunShuttleSearch()
 ////////////////////////////
 // Problem 14 - Docking Data
 
-typedef std::map<BigInt, BigInt> DockingDataMemory;
+typedef BigIntMap DockingDataMemory;
 
 void GenerateDockingFloatingBitIndexList(BigInt stompMask, BigInt origStompValueMask, BigIntList& list, bool verbose)
 {
@@ -2913,79 +2916,101 @@ void RunDockingData()
 ////////////////////////////
 // Problem 15 - Rambunctious Recitation
 
-void ProgressRambunctiousList(BigIntList& numberList, bool verbose)
+void ProgressRambunctiousList(BigIntMap& numberMap, BigInt& lastNumber, BigInt& lastNumberIndex, bool verbose)
 {
-    const BigInt lastNumber = numberList.back();
-
     if (verbose)
-        printf("  Last number was %lld,", lastNumber);
+        printf("  Last number was %lld at index %lld,", lastNumber, lastNumberIndex);
 
-    const BigInt lastNumberIndex = (BigInt)numberList.size() - 1;
-
-    bool foundNumber = false;
     BigInt newNumber = 0;
-    for (BigInt i = lastNumberIndex - 1; i >= 0; --i)
+    const auto findIter = numberMap.find(lastNumber);
+    if (findIter != numberMap.end())
     {
-        if (numberList[i] == lastNumber)
-        {
-            foundNumber = true;
-            newNumber = lastNumberIndex - i;
+        const BigInt prevNumberIndex = findIter->second;
+        newNumber = lastNumberIndex - findIter->second;
 
-            if (verbose)
-                printf(
-                    " which was found previously at index %lld, so new number = last index - prev index = %lld - %lld = %lld\n",
-                    i,
-                    lastNumberIndex,
-                    i,
-                    newNumber);
-
-            break;
-        }
+        if (verbose)
+            printf(
+                " which was found previously at index %lld, so new number = last index - prev index = %lld - %lld = %lld\n",
+                findIter->second,
+                lastNumberIndex,
+                findIter->second,
+                newNumber);
+    }
+    else
+    {
+        if (verbose)
+            printf(" which was not found, so new number = 0\n");
     }
 
-    if (!foundNumber && verbose)
-        printf(" which was not found, so new number = 0\n");
+    numberMap[lastNumber] = lastNumberIndex;
 
-    numberList.push_back(newNumber);
+    lastNumber = newNumber;
+    ++lastNumberIndex;
 }
 
-BigInt CalcNthRambunctiousNumber(BigIntList& numberList, BigInt n, bool verbose)
+BigInt CalcNthRambunctiousNumber(BigIntMap& numberMap, BigInt lastNumber, BigInt lastNumberIndex, BigInt n, bool verbose)
 {
-    assert((BigInt)numberList.size() < n);
+    const BigInt nMinusOne = n - 1;
 
-    while ((BigInt)numberList.size() < n)
-        ProgressRambunctiousList(numberList, verbose);
+    assert(lastNumberIndex < nMinusOne);
 
-    assert((BigInt)numberList.size() == n);
+    while (lastNumberIndex < nMinusOne)
+        ProgressRambunctiousList(numberMap, lastNumber, lastNumberIndex, verbose);
 
-    return numberList.back();
+    assert(lastNumberIndex == nMinusOne);
+
+    return lastNumber;
 }
 
-void CalcAndPrintNthRambunctiousNumber(std::initializer_list<BigInt> startList, BigInt n, bool verbose)
+void CalcAndPrintNthRambunctiousNumber(BigIntInitList startList, BigInt n, bool verbose)
 {
-    BigIntList numberList;
+    BigIntMap numberMap;
 
     printf("Given list ");
     for (const BigInt number: startList)
-    {
-        numberList.push_back(number);
         printf("%lld,", number);
+
+    const BigInt lastNumberIndex = (BigInt)startList.size() - 1;
+    BigInt index = lastNumberIndex;
+
+    auto iter = std::rbegin(startList);
+    const auto iterEnd = std::rend(startList);
+
+    BigInt lastNumber = *iter;
+
+    --index;
+    ++iter;
+    while (iter != iterEnd)
+    {
+        const BigInt thisNumber = *iter;
+        numberMap[thisNumber] = index;
+
+        --index;
+        ++iter;
     }
-    printf(" the %lldth number is %lld\n", n, CalcNthRambunctiousNumber(numberList, n, verbose));
+
+    printf(" the %lldth number is %lld\n", n, CalcNthRambunctiousNumber(numberMap, lastNumber, lastNumberIndex, n, verbose));
 }
 
 void RunRambunctiousRecitation()
 {
-    CalcAndPrintNthRambunctiousNumber({ 0, 3, 6 }, 2020, true);
-
+    CalcAndPrintNthRambunctiousNumber({ 0, 3, 6 }, 2020, false);
     CalcAndPrintNthRambunctiousNumber({ 1, 3, 2 }, 2020, false);
     CalcAndPrintNthRambunctiousNumber({ 2, 1, 3 }, 2020, false);
     CalcAndPrintNthRambunctiousNumber({ 1, 2, 3 }, 2020, false);
     CalcAndPrintNthRambunctiousNumber({ 2, 3, 1 }, 2020, false);
     CalcAndPrintNthRambunctiousNumber({ 3, 2, 1 }, 2020, false);
     CalcAndPrintNthRambunctiousNumber({ 3, 1, 2 }, 2020, false);
-
     CalcAndPrintNthRambunctiousNumber({ 15, 12, 0, 14, 3, 1 }, 2020, false);
+
+    CalcAndPrintNthRambunctiousNumber({ 0, 3, 6 }, 30000000, false);
+    CalcAndPrintNthRambunctiousNumber({ 1, 3, 2 }, 30000000, false);
+    CalcAndPrintNthRambunctiousNumber({ 2, 1, 3 }, 30000000, false);
+    CalcAndPrintNthRambunctiousNumber({ 1, 2, 3 }, 30000000, false);
+    CalcAndPrintNthRambunctiousNumber({ 2, 3, 1 }, 30000000, false);
+    CalcAndPrintNthRambunctiousNumber({ 3, 2, 1 }, 30000000, false);
+    CalcAndPrintNthRambunctiousNumber({ 3, 1, 2 }, 30000000, false);
+    CalcAndPrintNthRambunctiousNumber({ 15, 12, 0, 14, 3, 1 }, 30000000, false);
 }
 
 
