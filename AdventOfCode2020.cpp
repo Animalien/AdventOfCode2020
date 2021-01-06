@@ -18,7 +18,7 @@
 ////////////////////////////
 // Numeric
 
-typedef long long          BigInt;
+typedef long long BigInt;
 typedef unsigned long long BigUInt;
 
 const BigInt MAX_BIG_INT = LLONG_MAX;
@@ -123,12 +123,12 @@ public:
 private:
     iterator NewFactorize(BigInt num)
     {
-        auto           newValue = insert(value_type(num, Factorization()));
-        iterator       newIter = newValue.first;
+        auto newValue = insert(value_type(num, Factorization()));
+        iterator newIter = newValue.first;
         Factorization& newFactorization = newIter->second;
 
         const BigInt halfNum = num / 2;
-        BigInt       prodRemaining = num;
+        BigInt prodRemaining = num;
         for (BigInt i = 2; i <= halfNum; ++i)
         {
             const Factorization& f = Factorize(i);
@@ -172,9 +172,11 @@ static FactorizationCache s_factorizationCache;
 ////////////////////////////
 // Strings
 
+typedef std::vector<std::string> StringList;
+
 static const char* fileNameBase = "..\\Input\\";
 
-void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
+void ReadFileLines(const char* fileName, StringList& lines)
 {
     lines.clear();
 
@@ -202,7 +204,7 @@ void ReadFileLines(const char* fileName, std::vector<std::string>& lines)
     fclose(pFile);
 }
 
-void Tokenize(const std::string& st, std::vector<std::string>& tokens, char delim)
+void Tokenize(const std::string& st, StringList& tokens, char delim)
 {
     std::stringstream stream(st);
 
@@ -279,10 +281,10 @@ void IntersectSet(std::set<T>& lhs, const std::set<T>& rhs)
 {
     std::set<T> newSet;
 
-    auto       iterLeft = lhs.cbegin();
+    auto iterLeft = lhs.cbegin();
     const auto iterLeftEnd = lhs.cend();
 
-    auto       iterRight = rhs.cbegin();
+    auto iterRight = rhs.cbegin();
     const auto iterRightEnd = rhs.cend();
 
     for (;;)
@@ -416,7 +418,7 @@ void RunReportRepair()
 ////////////////////////////
 // Problem 2 - Password Philosophy
 
-void InitTestPasswordLines(std::vector<std::string>& lines)
+void InitTestPasswordLines(StringList& lines)
 {
     lines.clear();
     lines.push_back("1-3 a: abcde");
@@ -426,7 +428,7 @@ void InitTestPasswordLines(std::vector<std::string>& lines)
 
 void ParseNumber(const char*& pString, char untilChar, BigInt& number)
 {
-    char  temp[64];
+    char temp[64];
     char* pOutTemp = temp;
     while (*pString != untilChar)
     {
@@ -461,7 +463,7 @@ void ParsePasswordLine(const char* line, BigInt& num1, BigInt& num2, char& ch, s
     }
 }
 
-BigInt CountValidPasswords(const std::vector<std::string>& lines, bool newScheme, bool verbose)
+BigInt CountValidPasswords(const StringList& lines, bool newScheme, bool verbose)
 {
     BigInt numValidPasswords = 0;
 
@@ -473,7 +475,7 @@ BigInt CountValidPasswords(const std::vector<std::string>& lines, bool newScheme
 
         BigInt num1;
         BigInt num2;
-        char   ch;
+        char ch;
         ParsePasswordLine(iter->c_str(), num1, num2, ch, password);
 
         if (verbose)
@@ -532,12 +534,12 @@ BigInt CountValidPasswords(const std::vector<std::string>& lines, bool newScheme
 
 void RunPasswordPhilosophy()
 {
-    std::vector<std::string> passwordLines1;
+    StringList passwordLines1;
     InitTestPasswordLines(passwordLines1);
     printf("Num valid test passwords (first scheme) = %lld\n", CountValidPasswords(passwordLines1, false, true));
     printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines1, true, true));
 
-    std::vector<std::string> passwordLines2;
+    StringList passwordLines2;
     ReadFileLines("Day2Input.txt", passwordLines2);
     printf("Num valid test passwords (first scheme) = %lld\n", CountValidPasswords(passwordLines2, false, false));
     printf("Num valid test passwords (second scheme) = %lld\n", CountValidPasswords(passwordLines2, true, false));
@@ -547,7 +549,7 @@ void RunPasswordPhilosophy()
 ////////////////////////////
 // Problem 3 - Toboggan Trajectory
 
-void InitTobogTrajTestData(std::vector<std::string>& data)
+void InitTobogTrajTestData(StringList& data)
 {
     data.clear();
     data.push_back("..##.......");
@@ -563,7 +565,7 @@ void InitTobogTrajTestData(std::vector<std::string>& data)
     data.push_back(".#..#...#.#");
 }
 
-BigInt CountTobogTrajTrees(const std::vector<std::string>& data, BigInt rightStep, BigInt downStep, bool verbose)
+BigInt CountTobogTrajTrees(const StringList& data, BigInt rightStep, BigInt downStep, bool verbose)
 {
     BigInt numTrees = 0;
 
@@ -595,14 +597,14 @@ BigInt CountTobogTrajTrees(const std::vector<std::string>& data, BigInt rightSte
     return numTrees;
 }
 
-void IterateProdNumTreesDifferentSlopes(const std::vector<std::string>& data, BigInt rightStep, BigInt downStep, BigInt& prod)
+void IterateProdNumTreesDifferentSlopes(const StringList& data, BigInt rightStep, BigInt downStep, BigInt& prod)
 {
     const BigInt count = CountTobogTrajTrees(data, rightStep, downStep, false);
     printf("Num trees with slope (%lld,%lld) = %lld\n", rightStep, downStep, count);
     prod *= count;
 }
 
-void CalcProdNumTreesDifferentSlopes(const std::vector<std::string>& data)
+void CalcProdNumTreesDifferentSlopes(const StringList& data)
 {
     BigInt prod = 1;
 
@@ -619,7 +621,7 @@ void RunTobogganTrajectory()
     const BigInt rightStep = 3;
     const BigInt downStep = 1;
 
-    std::vector<std::string> testData;
+    StringList testData;
     InitTobogTrajTestData(testData);
     printf(
         "Num trees encountered in test data with slope (%lld,%lld) = %lld\n",
@@ -628,7 +630,7 @@ void RunTobogganTrajectory()
         CountTobogTrajTrees(testData, rightStep, downStep, true));
     CalcProdNumTreesDifferentSlopes(testData);
 
-    std::vector<std::string> fileData;
+    StringList fileData;
     ReadFileLines("Day3Input.txt", fileData);
     printf(
         "Num trees encountered in file data with slope (%lld,%lld) = %lld\n",
@@ -663,7 +665,7 @@ private:
         bool operator()(const char* a, const char* b) const { return (strcmp(a, b) < 0); }
     };
 
-    typedef std::string PassportEntry::*               FieldPtr;
+    typedef std::string PassportEntry::*FieldPtr;
     static const std::map<const char*, FieldPtr, Comp> s_fieldMap;
 };
 
@@ -721,9 +723,9 @@ void ReadPassportFile(const char* fileName, std::vector<PassportEntry>& data, bo
     assert(pFile);
 
     PassportEntry* pEntry = nullptr;
-    std::string    fieldName;
-    std::string    fieldValue;
-    std::string*   pStringReading = &fieldName;
+    std::string fieldName;
+    std::string fieldValue;
+    std::string* pStringReading = &fieldName;
 
     int ch = 0;
     int chPrev = 0;
@@ -900,7 +902,7 @@ BigInt CalcBoardingPassSeatID(const char* pass, bool verbose)
     return seatID;
 }
 
-void CalcSeatIDs(const std::vector<std::string>& data, std::set<BigInt>& seatIDs)
+void CalcSeatIDs(const StringList& data, std::set<BigInt>& seatIDs)
 {
     seatIDs.clear();
     for (BigInt i = 0; i < (BigInt)data.size(); ++i)
@@ -940,11 +942,11 @@ BigInt FindMySeatID(const std::set<BigInt>& seatIDs)
     BigInt prevSeatID = -1;
 
     const BigInt smallestSeatID = FindSmallestSeatID(seatIDs);
-    BigInt       smallestRow, smallestColumn;
+    BigInt smallestRow, smallestColumn;
     DecodeSeatID(smallestSeatID, smallestRow, smallestColumn);
 
     const BigInt largestSeatID = FindLargestSeatID(seatIDs);
-    BigInt       largestRow, largestColumn;
+    BigInt largestRow, largestColumn;
     DecodeSeatID(largestSeatID, largestRow, largestColumn);
 
     printf(
@@ -991,7 +993,7 @@ void RunBinaryBoarding()
     CalcBoardingPassSeatID("FFFBBBFRRR", true);
     CalcBoardingPassSeatID("BBFFBBFRLL", true);
 
-    std::vector<std::string> data;
+    StringList data;
     ReadFileLines("Day5Input.txt", data);
 
     std::set<BigInt> seatIDs;
@@ -1005,7 +1007,7 @@ void RunBinaryBoarding()
 ////////////////////////////
 // Problem 6 - Custom Customs
 
-BigInt CalcSumQuestionCountsAnyone(const std::vector<std::string>& data, bool verbose)
+BigInt CalcSumQuestionCountsAnyone(const StringList& data, bool verbose)
 {
     BigInt sum = 0;
 
@@ -1037,12 +1039,12 @@ BigInt CalcSumQuestionCountsAnyone(const std::vector<std::string>& data, bool ve
     return sum;
 }
 
-BigInt CalcSumQuestionCountsEveryone(const std::vector<std::string>& data, bool verbose)
+BigInt CalcSumQuestionCountsEveryone(const StringList& data, bool verbose)
 {
     BigInt sum = 0;
 
     std::set<char> intersectionQuestionSet;
-    bool           newPersonGroup = true;
+    bool newPersonGroup = true;
     std::set<char> currQuestionSet;
 
     for (BigInt i = 0; i < (BigInt)data.size(); ++i)
@@ -1081,12 +1083,12 @@ BigInt CalcSumQuestionCountsEveryone(const std::vector<std::string>& data, bool 
 
 void RunCustomCustoms()
 {
-    std::vector<std::string> testData;
+    StringList testData;
     ReadFileLines("Day6TestInput.txt", testData);
     printf("Sum question counts (anyone style) of test data = %lld\n", CalcSumQuestionCountsAnyone(testData, false));
     printf("Sum question counts (everyone style) of test data = %lld\n", CalcSumQuestionCountsEveryone(testData, true));
 
-    std::vector<std::string> data;
+    StringList data;
     ReadFileLines("Day6Input.txt", data);
     printf("Sum question counts (anyone style) = %lld\n", CalcSumQuestionCountsAnyone(data, false));
     printf("Sum question counts (everyone style) = %lld\n", CalcSumQuestionCountsEveryone(data, false));
@@ -1099,9 +1101,9 @@ void RunCustomCustoms()
 
 struct Haversack
 {
-    std::string                   type;
+    std::string type;
     std::map<std::string, BigInt> contains;
-    std::set<std::string>         canBeContainedBy;
+    std::set<std::string> canBeContainedBy;
 };
 
 const Haversack& GetConstHaversackFromData(const std::map<std::string, Haversack>& data, const std::string& type)
@@ -1114,8 +1116,8 @@ const Haversack& GetConstHaversackFromData(const std::map<std::string, Haversack
 
 Haversack& GetHaversackFromData(std::map<std::string, Haversack>& data, const std::string& type)
 {
-    auto       insertHaver = data.insert(std::pair<std::string, Haversack>(type, Haversack()));
-    auto       nodeIter = insertHaver.first;
+    auto insertHaver = data.insert(std::pair<std::string, Haversack>(type, Haversack()));
+    auto nodeIter = insertHaver.first;
     Haversack& rHaversack = nodeIter->second;
     if (insertHaver.second)
         rHaversack.type = type;
@@ -1126,10 +1128,10 @@ void ReadHaversackData(const char* fileName, std::map<std::string, Haversack>& d
 {
     data.clear();
 
-    std::vector<std::string> lines;
+    StringList lines;
     ReadFileLines(fileName, lines);
 
-    std::vector<std::string> tokens;
+    StringList tokens;
     for (BigInt i = 0; i < (BigInt)lines.size(); ++i)
     {
         Tokenize(lines[i], tokens, ' ');
@@ -1193,9 +1195,9 @@ void PrintHaversackData(const std::map<std::string, Haversack>& data)
 
 BigInt CalcHowManyBagsCanContain(
     const std::map<std::string, Haversack>& data,
-    const std::string&                      type,
-    bool                                    verbose,
-    std::set<std::string>*                  pAlreadyCheckedSet = nullptr)
+    const std::string& type,
+    bool verbose,
+    std::set<std::string>* pAlreadyCheckedSet = nullptr)
 {
     const Haversack& haversack = GetConstHaversackFromData(data, type);
 
@@ -1294,7 +1296,7 @@ enum class InstructionType
 struct Instruction
 {
     InstructionType type;
-    BigInt          arg;
+    BigInt arg;
 };
 
 class Program
@@ -1302,8 +1304,8 @@ class Program
 public:
     Program(const char* fileName) : m_nextInstructionIndex(0), m_accumulator(0), m_programTerminated(false)
     {
-        std::vector<std::string> lines;
-        std::vector<std::string> tokens;
+        StringList lines;
+        StringList tokens;
 
         ReadFileLines(fileName, lines);
 
@@ -1340,7 +1342,7 @@ public:
     }
 
     BigInt GetAccumulator() const { return m_accumulator; }
-    bool   DidProgramTerminate() const { return m_programTerminated; }
+    bool DidProgramTerminate() const { return m_programTerminated; }
 
     void ExecuteNextInstruction(bool verbose)
     {
@@ -1463,10 +1465,10 @@ public:
 private:
     std::vector<Instruction> m_instructions;
 
-    BigInt              m_nextInstructionIndex;
-    BigInt              m_accumulator;
+    BigInt m_nextInstructionIndex;
+    BigInt m_accumulator;
     std::vector<BigInt> m_instructionRunCounts;
-    bool                m_programTerminated;
+    bool m_programTerminated;
 };
 
 void RunHandheldHalting()
@@ -1476,9 +1478,9 @@ void RunHandheldHalting()
     testProgram.ExecuteUntilLoopsOrTerminates(true);
     printf("Accumulator = %lld\n", testProgram.GetAccumulator());
     printf("Fixing test program\n");
-    BigInt          instructionToFix;
+    BigInt instructionToFix;
     InstructionType origInstructionType;
-    BigInt          accumulatorAfterFix;
+    BigInt accumulatorAfterFix;
     testProgram.FindFix(instructionToFix, origInstructionType, accumulatorAfterFix, true);
     printf(
         "Test program was fixed by changing instruction %lld from %s to %s, allowing program to terminate normally with accumulator = %lld\n",
@@ -1510,7 +1512,7 @@ class XMasNumberSeries
 public:
     XMasNumberSeries(BigInt windowSize, const char* fileName) : m_windowSize(windowSize)
     {
-        std::vector<std::string> lines;
+        StringList lines;
         ReadFileLines(fileName, lines);
         for (BigInt i = 0; i < (BigInt)lines.size(); ++i)
         {
@@ -1567,13 +1569,13 @@ public:
     {
         assert(invalidNumber = FindFirstInvalidNumber(false));
 
-        BigInt           sum = 0;
+        BigInt sum = 0;
         std::set<BigInt> numbersInSum;
 
         assert(m_numbers.size() >= 2);
 
-        BigInt       firstIndex = 0;
-        BigInt       secondIndex = 1;
+        BigInt firstIndex = 0;
+        BigInt secondIndex = 1;
         const BigInt firstNumber = m_numbers[firstIndex];
         const BigInt secondNumber = m_numbers[secondIndex];
 
@@ -1690,14 +1692,14 @@ public:
 
 
 private:
-    BigInt              m_windowSize;
+    BigInt m_windowSize;
     std::vector<BigInt> m_numbers;
 };
 
 void RunEncodingError()
 {
     XMasNumberSeries testSeries(5, "Day9TestInput.txt");
-    BigInt           firstInvalidNumber = testSeries.FindFirstInvalidNumber(true);
+    BigInt firstInvalidNumber = testSeries.FindFirstInvalidNumber(true);
     printf("First invalid number in test series = %lld\n", firstInvalidNumber);
     printf("Encryption weakness = %lld\n", testSeries.FindEncryptionWeakness(firstInvalidNumber, true));
 
@@ -1713,7 +1715,7 @@ void RunEncodingError()
 
 void ReadAdapterArray(const char* fileName, std::set<BigInt>& jolts, bool verbose)
 {
-    std::vector<std::string> lines;
+    StringList lines;
     ReadFileLines(fileName, lines);
 
     jolts.clear();
@@ -1980,7 +1982,7 @@ public:
 
     void StepForward(BigInt seeingDistance, BigInt maxSeenOccupied, bool* pSomethingChanged = nullptr)
     {
-        std::vector<std::string> newSeats;
+        StringList newSeats;
         newSeats.resize(m_numSeatsY);
 
         bool somethingChanged = false;
@@ -2090,10 +2092,10 @@ private:
         return false;
     }
 
-    std::vector<std::string> m_origSeats;
-    std::vector<std::string> m_seats;
-    BigInt                   m_numSeatsX;
-    BigInt                   m_numSeatsY;
+    StringList m_origSeats;
+    StringList m_seats;
+    BigInt m_numSeatsX;
+    BigInt m_numSeatsY;
 };
 
 void RunSeatingSystem()
@@ -2129,7 +2131,7 @@ void StepRainRiskShip(BigInt& xPos, BigInt& yPos, BigInt& facing, const std::str
 {
     assert(command.length() >= 2);
 
-    const char   commandPrefix = command[0];
+    const char commandPrefix = command[0];
     const BigInt commandArg = atoi(command.c_str() + 1);
     switch (commandPrefix)
     {
@@ -2196,7 +2198,7 @@ void StepRainRiskShip(BigInt& xPos, BigInt& yPos, BigInt& facing, const std::str
         printf("New position is x = %lld, y = %lld, facing = %lld\n", xPos, yPos, facing);
 }
 
-BigInt CalcManhattanDistance(const std::vector<std::string>& lines, bool verbose)
+BigInt CalcManhattanDistance(const StringList& lines, bool verbose)
 {
     BigInt xPos = 0;
     BigInt yPos = 0;
@@ -2217,7 +2219,7 @@ void StepRainRiskShipWithWaypoint(
 {
     assert(command.length() >= 2);
 
-    const char   commandPrefix = command[0];
+    const char commandPrefix = command[0];
     const BigInt commandArg = atoi(command.c_str() + 1);
     switch (commandPrefix)
     {
@@ -2321,7 +2323,7 @@ void StepRainRiskShipWithWaypoint(
             waypointYPos);
 }
 
-BigInt CalcManhattanDistanceWithWaypoint(const std::vector<std::string>& lines, bool verbose)
+BigInt CalcManhattanDistanceWithWaypoint(const StringList& lines, bool verbose)
 {
     BigInt xPos = 0;
     BigInt yPos = 0;
@@ -2340,14 +2342,14 @@ BigInt CalcManhattanDistanceWithWaypoint(const std::vector<std::string>& lines, 
 
 void RunRainRisk()
 {
-    std::vector<std::string> testData;
+    StringList testData;
     ReadFileLines("Day12TestInput.txt", testData);
     printf("Manhattan distance after running commands in test data = %lld\n", CalcManhattanDistance(testData, true));
     printf(
         "Manhattan distance after running commands with waypoint in test data = %lld\n",
         CalcManhattanDistanceWithWaypoint(testData, true));
 
-    std::vector<std::string> mainData;
+    StringList mainData;
     ReadFileLines("Day12Input.txt", mainData);
     printf("Manhattan distance after running commands in main data = %lld\n", CalcManhattanDistance(mainData, false));
     printf(
@@ -2361,7 +2363,7 @@ void RunRainRisk()
 
 void BuildShuttleAvailBusList(const std::string& busesLine, std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
 {
-    std::vector<std::string> tokens;
+    StringList tokens;
     Tokenize(busesLine, tokens, ',');
 
     availBuses.clear();
@@ -2399,7 +2401,7 @@ void BuildShuttleAvailBusList(const std::string& busesLine, std::vector<std::pai
 void ReadShuttleSearchFile(
     const char* fileName, BigInt& startTime, std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
 {
-    std::vector<std::string> lines;
+    StringList lines;
     ReadFileLines(fileName, lines);
     assert(lines.size() == 2);
 
@@ -2522,14 +2524,14 @@ void IncrementSingleShuttleOffset(BigInt& offset, BigInt thisNum, BigInt increme
 
 void IncrementShuttleOffsets(
     const std::vector<std::pair<BigInt, BigInt>>& availBuses,
-    std::vector<BigInt>&                          offsets,
-    BigInt&                                       grandTotalAdded,
-    BigInt                                        focusIndex,
-    BigInt                                        increment,
-    bool                                          verbose)
+    std::vector<BigInt>& offsets,
+    BigInt& grandTotalAdded,
+    BigInt focusIndex,
+    BigInt increment,
+    bool verbose)
 {
     const BigInt focusNum = availBuses[focusIndex].first;
-    BigInt&      focusOffset = offsets[focusIndex];
+    BigInt& focusOffset = offsets[focusIndex];
 
     // get the focused index synced to 0
 
@@ -2626,14 +2628,14 @@ void TestInlineEarliestShuttleCase(const char* busLine, bool verbose)
 
 void RunShuttleSearch()
 {
-    BigInt                                 testStartTime = 0;
+    BigInt testStartTime = 0;
     std::vector<std::pair<BigInt, BigInt>> testAvailBuses;
     ReadShuttleSearchFile("Day13TestInput.txt", testStartTime, testAvailBuses, false);
     printf(
         "With test data, prod of shuttle ID of earliest departing bus and wait time = %lld\n",
         CalcShuttleProdIDAndWaitTime(testStartTime, testAvailBuses, false));
 
-    BigInt                                 mainStartTime = 0;
+    BigInt mainStartTime = 0;
     std::vector<std::pair<BigInt, BigInt>> mainAvailBuses;
     ReadShuttleSearchFile("Day13Input.txt", mainStartTime, mainAvailBuses, false);
     printf(
@@ -2652,6 +2654,111 @@ void RunShuttleSearch()
 }
 
 
+////////////////////////////
+// Problem 14 - Docking Data
+
+typedef std::map<BigInt, BigInt> DockingDataMemory;
+
+void WriteDockingDataValue(DockingDataMemory& memory, BigInt stompMask, BigInt stompValueMask, BigInt location, BigInt value)
+{
+    const BigInt actualValueToWrite = (stompMask & stompValueMask) | (~stompMask & value);
+    memory[location] = actualValueToWrite;
+}
+
+void ProcessDockingDataFile(const char* fileName, DockingDataMemory& memory)
+{
+    memory.clear();
+
+    StringList fileLines;
+    ReadFileLines(fileName, fileLines);
+
+    BigInt stompMask = 0;
+    BigInt stompValueMask = 0;
+    for (const auto& line: fileLines)
+    {
+        StringList tokens;
+        Tokenize(line, tokens, ' ');
+
+        assert(tokens.size() == 3);
+        assert(tokens[1] == "=");
+
+        const auto& first = tokens[0];
+        if (first == "mask")
+        {
+            stompMask = 0;
+            stompValueMask = 0;
+
+            const auto& mask = tokens[2];
+            for (const auto& ch: mask)
+            {
+                stompMask <<= 1;
+                stompValueMask <<= 1;
+                switch (ch)
+                {
+                    case 'X':
+                        // leave original value bit alone
+                        break;
+                    case '0':
+                        // stomp bit with 0
+                        stompMask |= 1;
+                        break;
+                    case '1':
+                        // stomp bit with 1
+                        stompMask |= 1;
+                        stompValueMask |= 1;
+                        break;
+                    default:
+                        assert(false && "Invalid mask character!");
+                        break;
+                }
+            }
+        }
+        else
+        {
+            assert(first.compare(0, 4, "mem[") == 0);
+            assert(first.back() == ']');
+
+            const BigInt location = atoll(first.c_str() + 4);
+            const BigInt value = atoll(tokens[2].c_str());
+            WriteDockingDataValue(memory, stompMask, stompValueMask, location, value);
+        }
+    }
+}
+
+void PrintDockingDataMemory(const char* name, const DockingDataMemory& memory)
+{
+    printf("Docking memory in %s:\n", name);
+    for (const auto& item: memory)
+    {
+        printf("  Location %lld, value %lld\n", item.first, item.second);
+    }
+}
+
+BigInt CalcSumDockingDataMemoryValues(const DockingDataMemory& memory)
+{
+    BigInt sum = 0;
+
+    for (const auto& node: memory)
+    {
+        sum += node.second;
+    }
+
+    return sum;
+}
+
+void RunDockingData()
+{
+    DockingDataMemory testData;
+    ProcessDockingDataFile("Day14TestInput.txt", testData);
+    PrintDockingDataMemory("test", testData);
+    printf("Test data sum of all memory values = %lld\n", CalcSumDockingDataMemoryValues(testData));
+
+    DockingDataMemory mainData;
+    ProcessDockingDataFile("Day14Input.txt", mainData);
+    PrintDockingDataMemory("main", mainData);
+    printf("Main data sum of all memory values = %lld\n", CalcSumDockingDataMemoryValues(mainData));
+}
+
 
 ////////////////////////////
 ////////////////////////////
@@ -2668,7 +2775,7 @@ int main(int argc, char** argv)
     }
 
     const char* problemArg = argv[1];
-    int         problemNum = atoi(problemArg);
+    int problemNum = atoi(problemArg);
     printf("Solving problem #%d\n\n", problemNum);
     switch (problemNum)
     {
@@ -2710,6 +2817,9 @@ int main(int argc, char** argv)
             break;
         case 13:
             RunShuttleSearch();
+            break;
+        case 14:
+            RunDockingData();
             break;
         default:
             printf("'%s' is not a valid problem number!\n\n", problemArg);
