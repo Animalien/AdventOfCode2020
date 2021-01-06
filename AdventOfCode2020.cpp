@@ -2916,24 +2916,25 @@ void RunDockingData()
 ////////////////////////////
 // Problem 15 - Rambunctious Recitation
 
-void ProgressRambunctiousList(BigIntMap& numberMap, BigInt& lastNumber, BigInt& lastNumberIndex, bool verbose)
+void ProgressRambunctiousList(BigIntList& numberMap, BigInt& lastNumber, BigInt& lastNumberIndex, bool verbose)
 {
     if (verbose)
         printf("  Last number was %lld at index %lld,", lastNumber, lastNumberIndex);
 
     BigInt newNumber = 0;
-    const auto findIter = numberMap.find(lastNumber);
-    if (findIter != numberMap.end())
+
+    const BigInt prevNumberIndex = numberMap[lastNumber];
+
+    if (prevNumberIndex >= 0)
     {
-        const BigInt prevNumberIndex = findIter->second;
-        newNumber = lastNumberIndex - findIter->second;
+        newNumber = lastNumberIndex - prevNumberIndex;
 
         if (verbose)
             printf(
                 " which was found previously at index %lld, so new number = last index - prev index = %lld - %lld = %lld\n",
-                findIter->second,
+                prevNumberIndex,
                 lastNumberIndex,
-                findIter->second,
+                prevNumberIndex,
                 newNumber);
     }
     else
@@ -2948,7 +2949,7 @@ void ProgressRambunctiousList(BigIntMap& numberMap, BigInt& lastNumber, BigInt& 
     ++lastNumberIndex;
 }
 
-BigInt CalcNthRambunctiousNumber(BigIntMap& numberMap, BigInt lastNumber, BigInt lastNumberIndex, BigInt n, bool verbose)
+BigInt CalcNthRambunctiousNumber(BigIntList& numberMap, BigInt lastNumber, BigInt lastNumberIndex, BigInt n, bool verbose)
 {
     const BigInt nMinusOne = n - 1;
 
@@ -2964,7 +2965,8 @@ BigInt CalcNthRambunctiousNumber(BigIntMap& numberMap, BigInt lastNumber, BigInt
 
 void CalcAndPrintNthRambunctiousNumber(BigIntInitList startList, BigInt n, bool verbose)
 {
-    BigIntMap numberMap;
+    BigIntList numberMap;
+    numberMap.resize(n, -1);
 
     printf("Given list ");
     for (const BigInt number: startList)
