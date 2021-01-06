@@ -19,6 +19,7 @@
 // Numeric
 
 typedef long long BigInt;
+typedef std::vector<BigInt> BigIntList;
 typedef unsigned long long BigUInt;
 
 const BigInt MAX_BIG_INT = LLONG_MAX;
@@ -1467,7 +1468,7 @@ private:
 
     BigInt m_nextInstructionIndex;
     BigInt m_accumulator;
-    std::vector<BigInt> m_instructionRunCounts;
+    BigIntList m_instructionRunCounts;
     bool m_programTerminated;
 };
 
@@ -1693,7 +1694,7 @@ public:
 
 private:
     BigInt m_windowSize;
-    std::vector<BigInt> m_numbers;
+    BigIntList m_numbers;
 };
 
 void RunEncodingError()
@@ -2524,7 +2525,7 @@ void IncrementSingleShuttleOffset(BigInt& offset, BigInt thisNum, BigInt increme
 
 void IncrementShuttleOffsets(
     const std::vector<std::pair<BigInt, BigInt>>& availBuses,
-    std::vector<BigInt>& offsets,
+    BigIntList& offsets,
     BigInt& grandTotalAdded,
     BigInt focusIndex,
     BigInt increment,
@@ -2562,7 +2563,7 @@ void IncrementShuttleOffsets(
 
 BigInt CalcEarliestShuttleTime2(const std::vector<std::pair<BigInt, BigInt>>& availBuses, bool verbose)
 {
-    std::vector<BigInt> offsets;
+    BigIntList offsets;
     offsets.reserve(availBuses.size());
 
     if (verbose)
@@ -2659,14 +2660,100 @@ void RunShuttleSearch()
 
 typedef std::map<BigInt, BigInt> DockingDataMemory;
 
-void WriteDockingDataValue(DockingDataMemory& memory, BigInt stompMask, BigInt stompValueMask, BigInt location, BigInt value)
+void GenerateDockingFloatingBitIndexList(BigInt stompMask, BigInt origStompValueMask, BigIntList& list, bool verbose)
 {
-    const BigInt actualValueToWrite = (stompMask & stompValueMask) | (~stompMask & value);
-    memory[location] = actualValueToWrite;
+    static const BigInt MAX_BIT_INDEX = 36;
+
+    if (verbose)
+        printf(
+            "   Generating floating bit index list from stompMask 0x%016llX, stompValueMask 0x%016llX\n",
+            stompMask,
+            origStompValueMask);
+
+    list.clear();
+    for (BigInt bitIndex = 0; bitIndex < MAX_BIT_INDEX; ++bitIndex)
+    {
+        const BigInt bitMask = 1LL << bitIndex;
+        if (!(stompMask & bitMask))
+            continue;
+        if (origStompValueMask & bitMask)
+            continue;
+
+        list.push_back(bitIndex);
+
+        if (verbose)
+            printf("      %lld\n", bitIndex);
+    }
 }
 
-void ProcessDockingDataFile(const char* fileName, DockingDataMemory& memory)
+void IterateGenerateDockingStompValueMaskList(
+    BigInt stompMask,
+    BigInt origStompValueMask,
+    BigInt stompValueMaskSoFar,
+    BigInt bitIndexIndex,
+    const BigIntList& floatingBitIndexList,
+    BigIntList& stompValueMaskList)
 {
+    if (bitIndexIndex >= (BigInt)floatingBitIndexList.size())
+    {
+        stompValueMaskList.push_back(stompValueMaskSoFar);
+        return;
+    }
+
+    const BigInt bitIndex = floatingBitIndexList[bitIndexIndex];
+    const BigInt bitMask = 1LL << bitIndex;
+
+    const BigInt nextBitIndexIndex = bitIndexIndex + 1;
+
+    IterateGenerateDockingStompValueMaskList(
+        stompMask,
+        origStompValueMask,
+        stompValueMaskSoFar,
+        nextBitIndexIndex,
+        floatingBitIndexList,
+        stompValueMaskList);
+    IterateGenerateDockingStompValueMaskList(
+        stompMask,
+        origStompValueMask,
+        stompValueMaskSoFar | bitMask,
+        nextBitIndexIndex,
+        floatingBitIndexList,
+        stompValueMaskList);
+}
+
+void GenerateDockingStompValueMaskList(BigInt stompMask, BigInt origStompValueMask, BigIntList& stompValueMaskList, bool verbose)
+{
+    BigIntList floatingBitIndexList;
+    GenerateDockingFloatingBitIndexList(stompMask, origStompValueMask, floatingBitIndexList, verbose);
+
+    stompValueMaskList.clear();
+    IterateGenerateDockingStompValueMaskList(
+        stompMask, origStompValueMask, origStompValueMask, 0, floatingBitIndexList, stompValueMaskList);
+}
+
+BigInt CalcStompMaskedValue(BigInt stompMask, BigInt stompValueMask, BigInt origValue)
+{
+    return (stompMask & stompValueMask) | (~stompMask & origValue);
+}
+
+void WriteDockingDataValue(
+    DockingDataMemory& memory, BigInt stompMask, const BigIntList& stompValueMaskList, BigInt location, BigInt value, bool version2, bool verbose)
+{
+    for (BigInt thisStompValueMask: stompValueMaskList)
+    {
+        const BigInt thisLocation = CalcStompMaskedValue(stompMask, thisStompValueMask, location);
+        memory[thisLocation] = value;
+
+        if (verbose)
+            printf("    mem[%lld->%lld] = %lld\n", location, thisLocation, value);
+    }
+}
+
+void ProcessDockingDataFile(const char* fileName, DockingDataMemory& memory, bool version2, bool verbose)
+{
+    if (verbose)
+        printf("Processing docking data from file %s\n", fileName);
+
     memory.clear();
 
     StringList fileLines;
@@ -2674,6 +2761,7 @@ void ProcessDockingDataFile(const char* fileName, DockingDataMemory& memory)
 
     BigInt stompMask = 0;
     BigInt stompValueMask = 0;
+    BigIntList stompValueMaskList;
     for (const auto& line: fileLines)
     {
         StringList tokens;
@@ -2685,31 +2773,80 @@ void ProcessDockingDataFile(const char* fileName, DockingDataMemory& memory)
         const auto& first = tokens[0];
         if (first == "mask")
         {
+            if (verbose)
+                printf("  Found mask: ");
+
             stompMask = 0;
             stompValueMask = 0;
+            stompValueMaskList.clear();
 
             const auto& mask = tokens[2];
             for (const auto& ch: mask)
             {
+                if (verbose)
+                    printf("%c", ch);
+
                 stompMask <<= 1;
                 stompValueMask <<= 1;
-                switch (ch)
+
+                if (version2)
+                    switch (ch)
+                    {
+                        case 'X':
+                            // stomp bit is a "floater"
+                            stompMask |= 1;
+                            break;
+                        case '0':
+                            // leave original value bit alone
+                            break;
+                        case '1':
+                            // stomp bit with 1
+                            stompMask |= 1;
+                            stompValueMask |= 1;
+                            break;
+                        default:
+                            assert(false && "Invalid mask character!");
+                            break;
+                    }
+                else
+                    switch (ch)
+                    {
+                        case 'X':
+                            // leave original value bit alone
+                            break;
+                        case '0':
+                            // stomp bit with 0
+                            stompMask |= 1;
+                            break;
+                        case '1':
+                            // stomp bit with 1
+                            stompMask |= 1;
+                            stompValueMask |= 1;
+                            break;
+                        default:
+                            assert(false && "Invalid mask character!");
+                            break;
+                    }
+            }
+
+            if (verbose)
+                printf("\n");
+
+            if (version2)
+                GenerateDockingStompValueMaskList(stompMask, stompValueMask, stompValueMaskList, verbose);
+            else
+                stompValueMaskList.push_back(stompValueMask);
+
+            if (verbose)
+            {
+                printf(
+                    "    Stomp mask = 0x%016llX\n"
+                    "    Stomp value masks:\n",
+                    stompMask);
+
+                for (const BigInt thisStompValueMask: stompValueMaskList)
                 {
-                    case 'X':
-                        // leave original value bit alone
-                        break;
-                    case '0':
-                        // stomp bit with 0
-                        stompMask |= 1;
-                        break;
-                    case '1':
-                        // stomp bit with 1
-                        stompMask |= 1;
-                        stompValueMask |= 1;
-                        break;
-                    default:
-                        assert(false && "Invalid mask character!");
-                        break;
+                    printf("      0x%016llX\n", thisStompValueMask);
                 }
             }
         }
@@ -2720,7 +2857,11 @@ void ProcessDockingDataFile(const char* fileName, DockingDataMemory& memory)
 
             const BigInt location = atoll(first.c_str() + 4);
             const BigInt value = atoll(tokens[2].c_str());
-            WriteDockingDataValue(memory, stompMask, stompValueMask, location, value);
+
+            if (verbose)
+                printf("  mem[%lld] = %lld\n", location, value);
+
+            WriteDockingDataValue(memory, stompMask, stompValueMaskList, location, value, version2, verbose);
         }
     }
 }
@@ -2749,14 +2890,22 @@ BigInt CalcSumDockingDataMemoryValues(const DockingDataMemory& memory)
 void RunDockingData()
 {
     DockingDataMemory testData;
-    ProcessDockingDataFile("Day14TestInput.txt", testData);
-    PrintDockingDataMemory("test", testData);
-    printf("Test data sum of all memory values = %lld\n", CalcSumDockingDataMemoryValues(testData));
+    ProcessDockingDataFile("Day14TestInput.txt", testData, false, true);
+    PrintDockingDataMemory("test (version 1)", testData);
+    printf("Test (version 1) data sum of all memory values = %lld\n", CalcSumDockingDataMemoryValues(testData));
+
+    DockingDataMemory testDataB;
+    ProcessDockingDataFile("Day14TestInputB.txt", testDataB, true, true);
+    PrintDockingDataMemory("testB (version 2)", testDataB);
+    printf("Test B (version 2) data sum of all memory values = %lld\n", CalcSumDockingDataMemoryValues(testDataB));
 
     DockingDataMemory mainData;
-    ProcessDockingDataFile("Day14Input.txt", mainData);
-    PrintDockingDataMemory("main", mainData);
-    printf("Main data sum of all memory values = %lld\n", CalcSumDockingDataMemoryValues(mainData));
+    ProcessDockingDataFile("Day14Input.txt", mainData, false, false);
+    //PrintDockingDataMemory("main version 1", mainData);
+    printf("Main data sum of all memory values (version 1) = %lld\n", CalcSumDockingDataMemoryValues(mainData));
+    ProcessDockingDataFile("Day14Input.txt", mainData, true, false);
+    //PrintDockingDataMemory("main version 2", mainData);
+    printf("Main data sum of all memory values (version 2) = %lld\n", CalcSumDockingDataMemoryValues(mainData));
 }
 
 
