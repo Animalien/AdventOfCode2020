@@ -220,6 +220,18 @@ void Tokenize(const std::string& st, StringList& tokens, char delim)
     }
 }
 
+void ParseBigIntList(const std::string& st, BigIntList& intList, char delim)
+{
+    StringList tokens;
+    Tokenize(st, tokens, delim);
+
+    intList.clear();
+    for (const auto& intString: tokens)
+    {
+        intList.push_back(atoll(intString.c_str()));
+    }
+}
+
 bool StringHasDigits(const std::string& st, BigInt start = 0, BigInt end = -1)
 {
     if (end <= 0)
@@ -3017,6 +3029,142 @@ void RunRambunctiousRecitation()
 
 
 ////////////////////////////
+// Problem 16 - Ticket Translation
+
+class TicketTranslationData
+{
+public:
+    TicketTranslationData(const char* fileName)
+    {
+        StringList fileLines;
+        ReadFileLines(fileName, fileLines);
+
+        // rules
+
+        m_ruleList.clear();
+        BigInt lineIndex = 0;
+        while (!fileLines[lineIndex].empty())
+        {
+            m_ruleList.push_back(Rule());
+            ParseRule(fileLines[lineIndex], m_ruleList.back());
+
+            ++lineIndex;
+        }
+
+        // my ticket
+
+        ++lineIndex;
+        assert(fileLines[lineIndex] == "your ticket:");
+        ++lineIndex;
+        ParseTicket(fileLines[lineIndex], m_myTicket);
+        ++lineIndex;
+        assert(fileLines[lineIndex].empty());
+
+        // nearby tickets
+
+        ++lineIndex;
+        assert(fileLines[lineIndex] == "nearby tickets:");
+        ++lineIndex;
+        m_nearbyTickets.clear();
+        for (; lineIndex < (BigInt)fileLines.size(); ++lineIndex)
+        {
+            m_nearbyTickets.push_back(Ticket());
+            ParseTicket(fileLines[lineIndex], m_nearbyTickets.back());
+        }
+    }
+
+    BigInt CalcTicketScanningErrorRate() const
+    {
+        BigInt errorRate = 0;
+        for (const auto& nearbyTicket: m_nearbyTickets)
+        {
+            for (const BigInt ticketValue: nearbyTicket)
+            {
+                if (!CanTicketNumberBeValid(ticketValue))
+                    errorRate += ticketValue;
+            }
+        }
+        return errorRate;
+    }
+
+private:
+    struct Rule
+    {
+        std::string name;
+        BigInt range1Min, range1Max;
+        BigInt range2Min, range2Max;
+
+        Rule() : name(), range1Min(-1), range1Max(-1), range2Min(-1), range2Max(-1) {}
+    };
+
+    void ParseRule(const std::string& st, Rule& rule)
+    {
+        StringList tokens;
+        Tokenize(st, tokens, ' ');
+
+        BigInt rangeStartIndex;
+        if (tokens.size() == 4)
+        {
+            rule.name = tokens[0];
+            rangeStartIndex = 1;
+        }
+        else
+        {
+            assert(tokens.size() == 5);
+            rule.name = tokens[0] + " " + tokens[1];   // ignore the ":" for now since we don't care about names yet
+            rangeStartIndex = 2;
+        }
+
+        assert(tokens[rangeStartIndex + 1] == "or");
+
+        ParseRange(tokens[rangeStartIndex], rule.range1Min, rule.range1Max);
+        ParseRange(tokens[rangeStartIndex + 2], rule.range2Min, rule.range2Max);
+    }
+
+    void ParseRange(const std::string& st, BigInt& min, BigInt& max)
+    {
+        StringList tokens;
+        Tokenize(st, tokens, '-');
+        assert(tokens.size() == 2);
+        min = atoll(tokens[0].c_str());
+        max = atoll(tokens[1].c_str());
+    }
+
+    typedef std::vector<Rule> RuleList;
+
+    RuleList m_ruleList;
+
+    typedef BigIntList Ticket;
+    typedef std::vector<Ticket> TicketList;
+
+    void ParseTicket(const std::string& st, Ticket& ticket) { ParseBigIntList(st, ticket, ','); }
+
+    bool CanTicketNumberBeValid(BigInt number) const
+    {
+        for (const auto& rule: m_ruleList)
+        {
+            if (((number >= rule.range1Min) && (number <= rule.range1Max))
+                || ((number >= rule.range2Min) && (number <= rule.range2Max)))
+                return true;
+        }
+        return false;
+    }
+
+    Ticket m_myTicket;
+    TicketList m_nearbyTickets;
+};
+
+void RunTicketTranslation()
+{
+    TicketTranslationData testData("Day16TestInput.txt");
+    printf("Test data ticket scanning error rate = %lld\n", testData.CalcTicketScanningErrorRate());
+
+    TicketTranslationData mainData("Day16Input.txt");
+    printf("Main data ticket scanning error rate = %lld\n", mainData.CalcTicketScanningErrorRate());
+}
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -3079,6 +3227,9 @@ int main(int argc, char** argv)
             break;
         case 15:
             RunRambunctiousRecitation();
+            break;
+        case 16:
+            RunTicketTranslation();
             break;
         default:
             printf("'%s' is not a valid problem number!\n\n", problemArg);
