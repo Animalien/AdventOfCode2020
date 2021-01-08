@@ -3350,24 +3350,29 @@ class PocketDimension
 public:
     PocketDimension(const char* fileName)
     {
-        m_grid.push_back(DimensionLayer());
-        ReadFileLines(fileName, m_grid.back());
+        m_grid.push_back(FullDimension());
+        m_grid[0].push_back(DimensionLayer());
+        ReadFileLines(fileName, m_grid[0].back());
         m_nextGrid = m_grid;
     }
 
     void Print() const
     {
-        BigInt minX, maxX, minY, maxY, minZ, maxZ;
-        CalcActiveExtents(minX, maxX, minY, maxY, minZ, maxZ);
+        BigInt minX, maxX, minY, maxY, minZ, maxZ, minW, maxW;
+        CalcActiveExtents(minX, maxX, minY, maxY, minZ, maxZ, minW, maxW);
 
-        for (BigInt z = minZ; z <= maxZ; ++z)
+        for (BigInt w = minW; w <= maxW; ++w)
         {
-            for (BigInt y = minY; y <= maxY; ++y)
+            for (BigInt z = minZ; z <= maxZ; ++z)
             {
-                for (BigInt x = minX; x <= maxX; ++x)
+                for (BigInt y = minY; y <= maxY; ++y)
                 {
-                    const char thisState = GetCellState(x, y, z);
-                    printf("%c", thisState);
+                    for (BigInt x = minX; x <= maxX; ++x)
+                    {
+                        const char thisState = GetCellState(x, y, z, w);
+                        printf("%c", thisState);
+                    }
+                    printf("\n");
                 }
                 printf("\n");
             }
@@ -3376,37 +3381,39 @@ public:
         printf("\n");
     }
 
-    void Iterate()
+    void Iterate(bool includeHyperDimension)
     {
         GrowIfNecessary();
 
-        const BigInt maxX = m_grid[0][0].length() - 1;
-        const BigInt maxY = m_grid[0].size() - 1;
-        const BigInt maxZ = m_grid.size() - 1;
+        BigInt minX, maxX, minY, maxY, minZ, maxZ, minW, maxW;
+        CalcActiveExtents(minX, maxX, minY, maxY, minZ, maxZ, minW, maxW, true, includeHyperDimension);
 
-        for (BigInt z = 0; z <= maxZ; ++z)
+        for (BigInt w = minW; w <= maxW; ++w)
         {
-            for (BigInt y = 0; y <= maxY; ++y)
+            for (BigInt z = minZ; z <= maxZ; ++z)
             {
-                for (BigInt x = 0; x <= maxX; ++x)
+                for (BigInt y = minY; y <= maxY; ++y)
                 {
-                    const char thisState = GetCellState(x, y, z);
-                    const BigInt numActiveNeighbors = CountActiveNeighbors(x, y, z);
-                    if (thisState == ACTIVE_STATE)
+                    for (BigInt x = minX; x <= maxX; ++x)
                     {
-                        if ((numActiveNeighbors == 2) || (numActiveNeighbors == 3))
-                            SetNextCellState(x, y, z, ACTIVE_STATE);
+                        const char thisState = GetCellState(x, y, z, w);
+                        const BigInt numActiveNeighbors = CountActiveNeighbors(x, y, z, w, includeHyperDimension);
+                        if (thisState == ACTIVE_STATE)
+                        {
+                            if ((numActiveNeighbors == 2) || (numActiveNeighbors == 3))
+                                SetNextCellState(x, y, z, w, ACTIVE_STATE);
+                            else
+                                SetNextCellState(x, y, z, w, INACTIVE_STATE);
+                        }
                         else
-                            SetNextCellState(x, y, z, INACTIVE_STATE);
-                    }
-                    else
-                    {
-                        assert(thisState == INACTIVE_STATE);
+                        {
+                            assert(thisState == INACTIVE_STATE);
 
-                        if (numActiveNeighbors == 3)
-                            SetNextCellState(x, y, z, ACTIVE_STATE);
-                        else
-                            SetNextCellState(x, y, z, INACTIVE_STATE);
+                            if (numActiveNeighbors == 3)
+                                SetNextCellState(x, y, z, w, ACTIVE_STATE);
+                            else
+                                SetNextCellState(x, y, z, w, INACTIVE_STATE);
+                        }
                     }
                 }
             }
@@ -3415,11 +3422,11 @@ public:
         m_grid.swap(m_nextGrid);
     }
 
-    BigInt CountActiveCellsAfterIterations(BigInt numIterations, bool verbose)
+    BigInt CountActiveCellsAfterIterations(BigInt numIterations, bool includeHyperDimension, bool verbose)
     {
         for (BigInt i = 0; i < numIterations; ++i)
         {
-            Iterate();
+            Iterate(includeHyperDimension);
 
             if (verbose)
             {
@@ -3433,15 +3440,27 @@ public:
 private:
     typedef StringList DimensionLayer;
     typedef std::vector<DimensionLayer> FullDimension;
+    typedef std::vector<FullDimension> HyperDimension;
 
     static const char ACTIVE_STATE = '#';
     static const char INACTIVE_STATE = '.';
 
-    void CalcActiveExtents(BigInt& minX, BigInt& maxX, BigInt& minY, BigInt& maxY, BigInt& minZ, BigInt& maxZ) const
+    void CalcActiveExtents(
+        BigInt& minX,
+        BigInt& maxX,
+        BigInt& minY,
+        BigInt& maxY,
+        BigInt& minZ,
+        BigInt& maxZ,
+        BigInt& minW,
+        BigInt& maxW,
+        bool puffXYZ = false,
+        bool puffW = false) const
     {
-        const BigInt sizeX = m_grid[0][0].length();
-        const BigInt sizeY = m_grid[0].size();
-        const BigInt sizeZ = m_grid.size();
+        const BigInt sizeX = m_grid[0][0][0].length();
+        const BigInt sizeY = m_grid[0][0].size();
+        const BigInt sizeZ = m_grid[0].size();
+        const BigInt sizeW = m_grid.size();
 
         minX = MAX_BIG_INT;
         maxX = MIN_BIG_INT;
@@ -3449,42 +3468,69 @@ private:
         maxY = MIN_BIG_INT;
         minZ = MAX_BIG_INT;
         maxZ = MIN_BIG_INT;
+        minW = MAX_BIG_INT;
+        maxW = MIN_BIG_INT;
 
-        for (BigInt z = 0; z < sizeZ; ++z)
+        for (BigInt w = 0; w < sizeW; ++w)
         {
-            for (BigInt y = 0; y < sizeY; ++y)
+            for (BigInt z = 0; z < sizeZ; ++z)
             {
-                for (BigInt x = 0; x < sizeX; ++x)
+                for (BigInt y = 0; y < sizeY; ++y)
                 {
-                    if (GetCellState(x, y, z) == ACTIVE_STATE)
+                    for (BigInt x = 0; x < sizeX; ++x)
                     {
-                        minX = std::min(x, minX);
-                        maxX = std::max(x, maxX);
+                        if (GetCellState(x, y, z, w) == ACTIVE_STATE)
+                        {
+                            minX = std::min(x, minX);
+                            maxX = std::max(x, maxX);
 
-                        minY = std::min(y, minY);
-                        maxY = std::max(y, maxY);
+                            minY = std::min(y, minY);
+                            maxY = std::max(y, maxY);
 
-                        minZ = std::min(z, minZ);
-                        maxZ = std::max(z, maxZ);
+                            minZ = std::min(z, minZ);
+                            maxZ = std::max(z, maxZ);
+
+                            minW = std::min(w, minW);
+                            maxW = std::max(w, maxW);
+                        }
                     }
                 }
             }
+        }
+
+        if (puffXYZ)
+        {
+            minX = std::max(0LL, minX - 1);
+            maxX = std::min(sizeX - 1, maxX + 1);
+            minY = std::max(0LL, minY - 1);
+            maxY = std::min(sizeY - 1, maxY + 1);
+            minZ = std::max(0LL, minZ - 1);
+            maxZ = std::min(sizeZ - 1, maxZ + 1);
+        }
+
+        if (puffW)
+        {
+            minW = std::max(0LL, minW - 1);
+            maxW = std::min(sizeW - 1, maxW + 1);
         }
     }
 
     void GrowIfNecessary()
     {
-        const BigInt sizeX = m_grid[0][0].length();
-        const BigInt sizeY = m_grid[0].size();
-        const BigInt sizeZ = m_grid.size();
+        const BigInt sizeX = m_grid[0][0][0].length();
+        const BigInt sizeY = m_grid[0][0].size();
+        const BigInt sizeZ = m_grid[0].size();
+        const BigInt sizeW = m_grid.size();
 
         const BigInt maxX = sizeX - 1;
         const BigInt maxY = sizeY - 1;
         const BigInt maxZ = sizeZ - 1;
+        const BigInt maxW = sizeW - 1;
 
-        if (!IsAnyActiveInRange(0, 0, 0, maxY, 0, maxZ) && !IsAnyActiveInRange(maxX, maxX, 0, maxY, 0, maxZ)
-            && !IsAnyActiveInRange(0, maxX, 0, 0, 0, maxZ) && !IsAnyActiveInRange(0, maxX, maxY, maxY, 0, maxZ)
-            && !IsAnyActiveInRange(0, maxX, 0, maxY, 0, 0) && !IsAnyActiveInRange(0, maxX, 0, maxY, maxZ, maxZ))
+        if (!IsAnyActiveInRange(0, 0, 0, maxY, 0, maxZ, 0, maxW) && !IsAnyActiveInRange(maxX, maxX, 0, maxY, 0, maxZ, 0, maxW)
+            && !IsAnyActiveInRange(0, maxX, 0, 0, 0, maxZ, 0, maxW) && !IsAnyActiveInRange(0, maxX, maxY, maxY, 0, maxZ, 0, maxW)
+            && !IsAnyActiveInRange(0, maxX, 0, maxY, 0, 0, 0, maxW) && !IsAnyActiveInRange(0, maxX, 0, maxY, maxZ, maxZ, 0, maxW)
+            && !IsAnyActiveInRange(0, maxX, 0, maxY, 0, maxZ, 0, 0) && !IsAnyActiveInRange(0, maxX, 0, maxY, 0, maxZ, maxW, maxW))
             return;
 
         // we have at least one active cell on a border, so grow x 3 in each dimension
@@ -3492,71 +3538,102 @@ private:
         const BigInt newSizeX = sizeX * 3;
         const BigInt newSizeY = sizeY * 3;
         const BigInt newSizeZ = sizeZ * 3;
+        const BigInt newSizeW = sizeW * 3;
 
         const std::string prefix(sizeX, INACTIVE_STATE);
         const std::string suffix(sizeY, INACTIVE_STATE);
-        for (auto& layer: m_grid)
+        for (auto& cube: m_grid)
         {
-            for (auto& line: layer)
+            for (auto& layer: cube)
             {
-                line.insert(0, prefix);
-                line.append(suffix);
+                for (auto& line: layer)
+                {
+                    line.insert(0, prefix);
+                    line.append(suffix);
+                }
             }
         }
-        for (auto& layer: m_nextGrid)
+        for (auto& cube: m_nextGrid)
         {
-            for (auto& line: layer)
+            for (auto& layer: cube)
             {
-                line.insert(0, prefix);
-                line.append(suffix);
+                for (auto& line: layer)
+                {
+                    line.insert(0, prefix);
+                    line.append(suffix);
+                }
             }
         }
 
         const std::string blankLine(newSizeX, INACTIVE_STATE);
-        for (auto& layer: m_grid)
+        for (auto& cube: m_grid)
         {
-            layer.insert(layer.begin(), sizeY, blankLine);
-            layer.insert(layer.end(), sizeY, blankLine);
+            for (auto& layer: cube)
+            {
+                layer.insert(layer.begin(), sizeY, blankLine);
+                layer.insert(layer.end(), sizeY, blankLine);
+            }
         }
-        for (auto& layer: m_nextGrid)
+        for (auto& cube: m_nextGrid)
         {
-            layer.insert(layer.begin(), sizeY, blankLine);
-            layer.insert(layer.end(), sizeY, blankLine);
+            for (auto& layer: cube)
+            {
+                layer.insert(layer.begin(), sizeY, blankLine);
+                layer.insert(layer.end(), sizeY, blankLine);
+            }
         }
 
         const DimensionLayer blankLayer(newSizeY, blankLine);
-        m_grid.insert(m_grid.begin(), sizeZ, blankLayer);
-        m_grid.insert(m_grid.end(), sizeZ, blankLayer);
-        m_nextGrid.insert(m_nextGrid.begin(), sizeZ, blankLayer);
-        m_nextGrid.insert(m_nextGrid.end(), sizeZ, blankLayer);
+        for (auto& cube: m_grid)
+        {
+            cube.insert(cube.begin(), sizeZ, blankLayer);
+            cube.insert(cube.end(), sizeZ, blankLayer);
+        }
+        for (auto& cube: m_nextGrid)
+        {
+            cube.insert(cube.begin(), sizeZ, blankLayer);
+            cube.insert(cube.end(), sizeZ, blankLayer);
+        }
+
+        const FullDimension blankCube(newSizeZ, blankLayer);
+        m_grid.insert(m_grid.begin(), sizeW, blankCube);
+        m_grid.insert(m_grid.end(), sizeW, blankCube);
+        m_nextGrid.insert(m_nextGrid.begin(), sizeW, blankCube);
+        m_nextGrid.insert(m_nextGrid.end(), sizeW, blankCube);
     }
 
-    bool IsAnyActiveInRange(BigInt minX, BigInt maxX, BigInt minY, BigInt maxY, BigInt minZ, BigInt maxZ) const
+    bool IsAnyActiveInRange(
+        BigInt minX, BigInt maxX, BigInt minY, BigInt maxY, BigInt minZ, BigInt maxZ, BigInt minW, BigInt maxW) const
     {
-        return CountActiveInRange(minX, maxX, minY, maxY, minZ, maxZ) > 0;
+        return CountActiveInRange(minX, maxX, minY, maxY, minZ, maxZ, minW, maxW) > 0;
     }
 
     BigInt CountActiveInGrid() const
     {
-        const BigInt maxX = m_grid[0][0].length() - 1;
-        const BigInt maxY = m_grid[0].size() - 1;
-        const BigInt maxZ = m_grid.size() - 1;
+        const BigInt maxX = m_grid[0][0][0].length() - 1;
+        const BigInt maxY = m_grid[0][0].size() - 1;
+        const BigInt maxZ = m_grid[0].size() - 1;
+        const BigInt maxW = m_grid.size() - 1;
 
-        return CountActiveInRange(0, maxX, 0, maxY, 0, maxZ);
+        return CountActiveInRange(0, maxX, 0, maxY, 0, maxZ, 0, maxW);
     }
 
-    BigInt CountActiveInRange(BigInt minX, BigInt maxX, BigInt minY, BigInt maxY, BigInt minZ, BigInt maxZ) const
+    BigInt CountActiveInRange(
+        BigInt minX, BigInt maxX, BigInt minY, BigInt maxY, BigInt minZ, BigInt maxZ, BigInt minW, BigInt maxW) const
     {
         BigInt count = 0;
-        for (BigInt z = minZ; z <= maxZ; ++z)
+        for (BigInt w = minW; w <= maxW; ++w)
         {
-            for (BigInt y = minY; y <= maxY; ++y)
+            for (BigInt z = minZ; z <= maxZ; ++z)
             {
-                for (BigInt x = minX; x <= maxX; ++x)
+                for (BigInt y = minY; y <= maxY; ++y)
                 {
-                    if (GetCellState(x, y, z) == ACTIVE_STATE)
+                    for (BigInt x = minX; x <= maxX; ++x)
                     {
-                        ++count;
+                        if (GetCellState(x, y, z, w) == ACTIVE_STATE)
+                        {
+                            ++count;
+                        }
                     }
                 }
             }
@@ -3565,27 +3642,32 @@ private:
         return count;
     }
 
-    BigInt CountActiveNeighbors(BigInt x, BigInt y, BigInt z) const
+    BigInt CountActiveNeighbors(BigInt x, BigInt y, BigInt z, BigInt w, bool includeHyperDimension) const
     {
         const BigInt x0 = std::max(0LL, x - 1);
-        const BigInt x1 = std::min((BigInt)m_grid[0][0].length() - 1, x + 1);
+        const BigInt x1 = std::min((BigInt)m_grid[0][0][0].length() - 1, x + 1);
         const BigInt y0 = std::max(0LL, y - 1);
-        const BigInt y1 = std::min((BigInt)m_grid[0].size() - 1, y + 1);
+        const BigInt y1 = std::min((BigInt)m_grid[0][0].size() - 1, y + 1);
         const BigInt z0 = std::max(0LL, z - 1);
-        const BigInt z1 = std::min((BigInt)m_grid.size() - 1, z + 1);
+        const BigInt z1 = std::min((BigInt)m_grid[0].size() - 1, z + 1);
+        const BigInt w0 = includeHyperDimension ? std::max(0LL, w - 1) : w;
+        const BigInt w1 = includeHyperDimension ? std::min((BigInt)m_grid.size() - 1, w + 1) : w;
 
         BigInt sum = 0;
-        for (BigInt zi = z0; zi <= z1; ++zi)
+        for (BigInt wi = w0; wi <= w1; ++wi)
         {
-            for (BigInt yi = y0; yi <= y1; ++yi)
+            for (BigInt zi = z0; zi <= z1; ++zi)
             {
-                for (BigInt xi = x0; xi <= x1; ++xi)
+                for (BigInt yi = y0; yi <= y1; ++yi)
                 {
-                    if ((xi == x) && (yi == y) && (zi == z))
-                        continue;
+                    for (BigInt xi = x0; xi <= x1; ++xi)
+                    {
+                        if ((xi == x) && (yi == y) && (zi == z) && (wi == w))
+                            continue;
 
-                    if (GetCellState(xi, yi, zi) == ACTIVE_STATE)
-                        ++sum;
+                        if (GetCellState(xi, yi, zi, wi) == ACTIVE_STATE)
+                            ++sum;
+                    }
                 }
             }
         }
@@ -3593,11 +3675,11 @@ private:
         return sum;
     }
 
-    char GetCellState(BigInt x, BigInt y, BigInt z) const { return m_grid[z][y][x]; }
-    void SetNextCellState(BigInt x, BigInt y, BigInt z, char newState) { m_nextGrid[z][y][x] = newState; }
+    char GetCellState(BigInt x, BigInt y, BigInt z, BigInt w) const { return m_grid[w][z][y][x]; }
+    void SetNextCellState(BigInt x, BigInt y, BigInt z, BigInt w, char newState) { m_nextGrid[w][z][y][x] = newState; }
 
-    FullDimension m_grid;
-    FullDimension m_nextGrid;
+    HyperDimension m_grid;
+    HyperDimension m_nextGrid;
 };
 
 void RunConwayCubes()
@@ -3610,7 +3692,7 @@ void RunConwayCubes()
     printf(
         "Test data num active cells after %lld iterations = %lld\n",
         NUM_ITERATIONS,
-        testData.CountActiveCellsAfterIterations(NUM_ITERATIONS, true));
+        testData.CountActiveCellsAfterIterations(NUM_ITERATIONS, false, true));
 
     printf("\nMain data init state\n\n");
     PocketDimension mainData("Day17Input.txt");
@@ -3618,7 +3700,23 @@ void RunConwayCubes()
     printf(
         "Main data num active cells after %lld iterations = %lld\n",
         NUM_ITERATIONS,
-        mainData.CountActiveCellsAfterIterations(NUM_ITERATIONS, false));
+        mainData.CountActiveCellsAfterIterations(NUM_ITERATIONS, false, false));
+
+    PocketDimension testData2("Day17TestInput.txt");
+    printf("Test data 2 init state\n\n");
+    //testData2.Print();
+    printf(
+        "Test data 2 num active cells after %lld iterations = %lld\n",
+        NUM_ITERATIONS,
+        testData2.CountActiveCellsAfterIterations(NUM_ITERATIONS, true, true));
+
+    printf("\nMain data 2 init state\n\n");
+    PocketDimension mainData2("Day17Input.txt");
+    //mainData2.Print();
+    printf(
+        "Main data 2 num active cells after %lld iterations = %lld\n",
+        NUM_ITERATIONS,
+        mainData2.CountActiveCellsAfterIterations(NUM_ITERATIONS, true, false));
 }
 
 
