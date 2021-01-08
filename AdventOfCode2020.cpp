@@ -3791,18 +3791,57 @@ void ParseExpressionString(const char*& st, Expression& expression, bool verbose
     }
 }
 
-BigInt CalcExpression(const Expression& expression, bool verbose)
+BigInt CalcExpression(Expression& expression, bool withAddPrecedence, bool verbose)
 {
     assert(!expression.empty());
+
+    // first evaluate subexpressions
+
+    for (auto& node: expression)
+    {
+        if (!node.subExpression.empty())
+        {
+            node.number = CalcExpression(node.subExpression, withAddPrecedence, verbose);
+            node.subExpression.clear();
+        }
+    }
+
+    // then collapse adds if we are using add precedence
+
+    if (withAddPrecedence)
+    {
+        ExpressionNode* pFirstAddendNode = &(expression[0]);
+        for (BigInt i = 1; i < (BigInt)expression.size(); ++i)
+        {
+            ExpressionNode& thisNode = expression[i];
+            assert(thisNode.subExpression.empty());
+
+            if (thisNode.add)
+            {
+                // add in this number to the first addend of this sequence
+                pFirstAddendNode->number += thisNode.number;
+
+                // turn this node into a multiply by 1
+                thisNode.add = false;
+                thisNode.multiply = true;
+                thisNode.number = 1;
+            }
+            else
+            {
+                pFirstAddendNode = &thisNode;
+            }
+        }
+    }
+
+    // then add/multiply all the remaining values
 
     BigInt runningNumber = 0;
     bool sawFirstNode = false;
     for (const auto& node: expression)
     {
-        BigInt thisNumber = node.number;
-        if (!node.subExpression.empty())
-            thisNumber = CalcExpression(node.subExpression, verbose);
+        assert(node.subExpression.empty());
 
+        BigInt thisNumber = node.number;
         if (!sawFirstNode)
         {
             assert(!node.add && !node.multiply);
@@ -3814,6 +3853,7 @@ BigInt CalcExpression(const Expression& expression, bool verbose)
             if (node.add)
             {
                 assert(!node.multiply);
+                assert(!withAddPrecedence); // all adds should have been eliminated up above
 
                 runningNumber += thisNumber;
             }
@@ -3829,7 +3869,7 @@ BigInt CalcExpression(const Expression& expression, bool verbose)
     return runningNumber;
 }
 
-BigInt ParseAndCalcExpression(const std::string& st, bool verbose)
+BigInt ParseAndCalcExpression(const std::string& st, bool withAddPrecedence, bool verbose)
 {
     assert(!st.empty());
 
@@ -3837,15 +3877,15 @@ BigInt ParseAndCalcExpression(const std::string& st, bool verbose)
     Expression expression;
     ParseExpressionString(pSt, expression, verbose);
 
-    return CalcExpression(expression, verbose);
+    return CalcExpression(expression, withAddPrecedence, verbose);
 }
 
-BigInt CalcExpressionListSum(const StringList& expressionList, bool verbose)
+BigInt CalcExpressionListSum(const StringList& expressionList, bool withAddPrecedence, bool verbose)
 {
     BigInt sum = 0;
     for (const auto& expression: expressionList)
     {
-        const BigInt answer = ParseAndCalcExpression(expression, verbose);
+        const BigInt answer = ParseAndCalcExpression(expression, withAddPrecedence, verbose);
         sum += answer;
 
         if (verbose)
@@ -3859,11 +3899,13 @@ void RunOperationOrder()
 {
     StringList testData;
     ReadFileLines("Day18TestInput.txt", testData);
-    printf("Test data, expression list sum = %lld\n", CalcExpressionListSum(testData, true));
+    printf("Test data, expression list sum = %lld\n", CalcExpressionListSum(testData, false, true));
+    printf("Test data, expression list sum with add precedence = %lld\n", CalcExpressionListSum(testData, true, true));
 
     StringList mainData;
     ReadFileLines("Day18Input.txt", mainData);
-    printf("Main data, expression list sum = %lld\n", CalcExpressionListSum(mainData, false));
+    printf("Main data, expression list sum = %lld\n", CalcExpressionListSum(mainData, false, false));
+    printf("Main data, expression list sum with add precedence = %lld\n", CalcExpressionListSum(mainData, true, false));
 }
 
 
