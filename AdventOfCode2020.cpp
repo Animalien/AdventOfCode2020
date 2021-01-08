@@ -22,6 +22,7 @@ typedef long long BigInt;
 typedef std::initializer_list<BigInt> BigIntInitList;
 typedef std::vector<BigInt> BigIntList;
 typedef std::map<BigInt, BigInt> BigIntMap;
+typedef std::set<BigInt> BigIntSet;
 
 typedef unsigned long long BigUInt;
 
@@ -3087,14 +3088,90 @@ public:
         return errorRate;
     }
 
+    void RemoveInvalidTickets()
+    {
+        const auto removeIter = std::remove_if(
+            m_nearbyTickets.begin(), m_nearbyTickets.end(), [&](const Ticket& ticket) { return !CanTicketBeValid(ticket); });
+
+        if (removeIter != m_nearbyTickets.end())
+            m_nearbyTickets.erase(removeIter, m_nearbyTickets.end());
+    }
+
+    void CalcFieldIndices(bool verbose)
+    {
+        if (verbose)
+            printf("Calculating field indices\n\nRemoving invalid tickets\n");
+
+        RemoveInvalidTickets();
+
+        if (verbose)
+            printf("Absorbing tickets into rule field index sets\n");
+        for (const auto& ticket: m_nearbyTickets)
+        {
+            if (verbose)
+                printf("  One ticket\n");
+
+            for (auto& rule: m_ruleList)
+            {
+                if (verbose)
+                    printf("    One rule\n");
+
+                AbsorbTicketIntoRuleFieldIndexSet(ticket, rule);
+            }
+        }
+
+        if (verbose)
+            PrintRuleFields();
+
+        for (;;)
+        {
+            const bool wasAbleToReduce = ReduceRuleFieldSets();
+
+            if (verbose)
+                PrintRuleFields();
+
+            if (!wasAbleToReduce)
+                break;
+        }
+    }
+
+    BigInt CalcProductOfMyTicketFieldsWithPrefix(const std::string& prefix, bool verbose) const
+    {
+        BigInt product = 1;
+        for (const auto& rule: m_ruleList)
+        {
+            if (rule.name.compare(0, prefix.length(), prefix) == 0)
+            {
+                const BigInt myTicketFieldValue = m_myTicket[rule.fieldIndex];
+                product *= myTicketFieldValue;
+
+                if (verbose)
+                    printf(
+                        "Found valid field '%s', product = product * field value = %lld * %lld = %lld\n",
+                        rule.name.c_str(),
+                        product / myTicketFieldValue,
+                        myTicketFieldValue,
+                        product);
+            }
+            else
+            {
+                if (verbose)
+                    printf("Field '%s' does not contain prefix '%s'\n", rule.name.c_str(), prefix.c_str());
+            }
+        }
+        return product;
+    }
+
 private:
     struct Rule
     {
         std::string name;
         BigInt range1Min, range1Max;
         BigInt range2Min, range2Max;
+        BigIntSet fieldIndexSet;
+        BigInt fieldIndex;
 
-        Rule() : name(), range1Min(-1), range1Max(-1), range2Min(-1), range2Max(-1) {}
+        Rule() : name(), range1Min(-1), range1Max(-1), range2Min(-1), range2Max(-1), fieldIndexSet(), fieldIndex(-1) {}
     };
 
     void ParseRule(const std::string& st, Rule& rule)
@@ -3134,20 +3211,109 @@ private:
 
     RuleList m_ruleList;
 
+    void PrintRuleFields()
+    {
+        printf("Rule fields:\n");
+        for (const auto& rule: m_ruleList)
+        {
+            printf("  Rule: ");
+            if (!rule.fieldIndexSet.empty())
+            {
+                printf("set = ");
+                for (const BigInt index: rule.fieldIndexSet)
+                {
+                    printf("%lld ", index);
+                }
+                printf("\n");
+            }
+            else
+            {
+                printf("index = %lld\n", rule.fieldIndex);
+            }
+        }
+    }
+
+    bool ReduceRuleFieldSets()
+    {
+        // look for a set of one, then assign that index there and remove it from all other sets
+        BigInt singularIndex = -1;
+        for (const auto& rule: m_ruleList)
+        {
+            if (rule.fieldIndexSet.size() == 1)
+            {
+                assert(singularIndex < 0);
+                singularIndex = *rule.fieldIndexSet.cbegin();
+            }
+        }
+
+        if (singularIndex < 0)
+            return false;
+
+        for (auto& rule: m_ruleList)
+        {
+            if (!rule.fieldIndexSet.empty())
+            {
+                if (rule.fieldIndexSet.size() == 1)
+                {
+                    assert(singularIndex == *rule.fieldIndexSet.cbegin());
+                    rule.fieldIndex = singularIndex;
+                    rule.fieldIndexSet.clear();
+                }
+                else
+                {
+                    rule.fieldIndexSet.erase(singularIndex);
+                }
+            }
+        }
+
+        return true;
+    }
+
     typedef BigIntList Ticket;
     typedef std::vector<Ticket> TicketList;
 
     void ParseTicket(const std::string& st, Ticket& ticket) { ParseBigIntList(st, ticket, ','); }
 
+    bool CanTicketBeValid(const Ticket& ticket) const
+    {
+        for (const BigInt ticketValue: ticket)
+        {
+            if (!CanTicketNumberBeValid(ticketValue))
+                return false;
+        }
+        return true;
+    }
+
     bool CanTicketNumberBeValid(BigInt number) const
     {
         for (const auto& rule: m_ruleList)
         {
-            if (((number >= rule.range1Min) && (number <= rule.range1Max))
-                || ((number >= rule.range2Min) && (number <= rule.range2Max)))
+            if (IsTicketNumberAllowedByRule(number, rule))
                 return true;
         }
         return false;
+    }
+
+    bool IsTicketNumberAllowedByRule(BigInt number, const Rule& rule) const
+    {
+        return ((number >= rule.range1Min) && (number <= rule.range1Max))
+               || ((number >= rule.range2Min) && (number <= rule.range2Max));
+    }
+
+    void AbsorbTicketIntoRuleFieldIndexSet(const Ticket& ticket, Rule& rule)
+    {
+        BigIntSet thisSet;
+        for (BigInt i = 0; i < (BigInt)ticket.size(); ++i)
+        {
+            const BigInt ticketNumber = ticket[i];
+            if (IsTicketNumberAllowedByRule(ticketNumber, rule))
+                thisSet.insert(i);
+        }
+
+        if (rule.fieldIndexSet.empty())
+            rule.fieldIndexSet.swap(thisSet);
+        else
+            IntersectSet(rule.fieldIndexSet, thisSet);
     }
 
     Ticket m_myTicket;
@@ -3158,9 +3324,17 @@ void RunTicketTranslation()
 {
     TicketTranslationData testData("Day16TestInput.txt");
     printf("Test data ticket scanning error rate = %lld\n", testData.CalcTicketScanningErrorRate());
+    //testData.CalcFieldIndices(false); -- this set of test data does not have a valid solution here
+
+    TicketTranslationData testDataB("Day16TestInputB.txt");
+    printf("Test data B ticket scanning error rate = %lld\n", testDataB.CalcTicketScanningErrorRate());
+    testDataB.CalcFieldIndices(true);
 
     TicketTranslationData mainData("Day16Input.txt");
     printf("Main data ticket scanning error rate = %lld\n", mainData.CalcTicketScanningErrorRate());
+    mainData.CalcFieldIndices(true);
+    const std::string prefix = "departure";
+    printf("Main data tickets, product of my ticket fields with prefix %s = %lld\n", prefix.c_str(), mainData.CalcProductOfMyTicketFieldsWithPrefix(prefix, true));
 }
 
 
