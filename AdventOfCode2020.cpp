@@ -3720,6 +3720,153 @@ void RunConwayCubes()
 }
 
 
+////////////////////////////
+// Problem 17 - Operation Order
+
+struct ExpressionNode;
+
+typedef std::vector<ExpressionNode> Expression;
+
+struct ExpressionNode
+{
+    bool add;
+    bool multiply;
+    BigInt number;
+    Expression subExpression;
+
+    ExpressionNode() : add(false), multiply(false), number(0), subExpression() {}
+};
+
+void ParseExpressionString(const char*& st, Expression& expression, bool verbose)
+{
+    static std::string numberParse;
+    for (;;)
+    {
+        if (*st == '\0')
+            break;
+        if (*st == ')')
+        {
+            ++st;
+            if (*st == ' ')
+                ++st;
+            break;
+        }
+
+        expression.push_back(ExpressionNode());
+        ExpressionNode& node = expression.back();
+
+        if (*st == '*')
+        {
+            node.multiply = true;
+            ++st;
+            assert(*st == ' ');
+            ++st;
+        }
+        else if (*st == '+')
+        {
+            node.add = true;
+            ++st;
+            assert(*st == ' ');
+            ++st;
+        }
+
+        if (*st == '(')
+        {
+            ++st;
+            ParseExpressionString(st, node.subExpression, verbose);
+        }
+        else
+        {
+            numberParse.clear();
+            while ((*st >= '0') && (*st <= '9'))
+            {
+                numberParse += *st;
+                ++st;
+            }
+            node.number = atoll(numberParse.c_str());
+
+            if (*st == ' ')
+                ++st;
+        }
+    }
+}
+
+BigInt CalcExpression(const Expression& expression, bool verbose)
+{
+    assert(!expression.empty());
+
+    BigInt runningNumber = 0;
+    bool sawFirstNode = false;
+    for (const auto& node: expression)
+    {
+        BigInt thisNumber = node.number;
+        if (!node.subExpression.empty())
+            thisNumber = CalcExpression(node.subExpression, verbose);
+
+        if (!sawFirstNode)
+        {
+            assert(!node.add && !node.multiply);
+            sawFirstNode = true;
+            runningNumber = thisNumber;
+        }
+        else
+        {
+            if (node.add)
+            {
+                assert(!node.multiply);
+
+                runningNumber += thisNumber;
+            }
+            else
+            {
+                assert(node.multiply);
+
+                runningNumber *= thisNumber;
+            }
+        }
+    }
+
+    return runningNumber;
+}
+
+BigInt ParseAndCalcExpression(const std::string& st, bool verbose)
+{
+    assert(!st.empty());
+
+    const char* pSt = &(st[0]);
+    Expression expression;
+    ParseExpressionString(pSt, expression, verbose);
+
+    return CalcExpression(expression, verbose);
+}
+
+BigInt CalcExpressionListSum(const StringList& expressionList, bool verbose)
+{
+    BigInt sum = 0;
+    for (const auto& expression: expressionList)
+    {
+        const BigInt answer = ParseAndCalcExpression(expression, verbose);
+        sum += answer;
+
+        if (verbose)
+            printf("  %s = %lld\n", expression.c_str(), answer);
+    }
+
+    return sum;
+}
+
+void RunOperationOrder()
+{
+    StringList testData;
+    ReadFileLines("Day18TestInput.txt", testData);
+    printf("Test data, expression list sum = %lld\n", CalcExpressionListSum(testData, true));
+
+    StringList mainData;
+    ReadFileLines("Day18Input.txt", mainData);
+    printf("Main data, expression list sum = %lld\n", CalcExpressionListSum(mainData, false));
+}
+
+
 
 ////////////////////////////
 ////////////////////////////
@@ -3790,6 +3937,9 @@ int main(int argc, char** argv)
             break;
         case 17:
             RunConwayCubes();
+            break;
+        case 18:
+            RunOperationOrder();
             break;
         default:
             printf("'%s' is not a valid problem number!\n\n", problemArg);
