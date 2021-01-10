@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 
@@ -21,6 +22,7 @@
 typedef long long BigInt;
 typedef std::initializer_list<BigInt> BigIntInitList;
 typedef std::vector<BigInt> BigIntList;
+typedef std::vector<BigIntList> BigIntListList;
 typedef std::map<BigInt, BigInt> BigIntMap;
 typedef std::set<BigInt> BigIntSet;
 
@@ -179,6 +181,8 @@ static FactorizationCache s_factorizationCache;
 // Strings
 
 typedef std::vector<std::string> StringList;
+typedef std::set<std::string> StringSet;
+typedef std::unordered_set<std::string> UnorderedStringSet;
 
 static const char* fileNameBase = "..\\Input\\";
 
@@ -288,6 +292,26 @@ bool StringIsIntWithinRangeAndSuffix(const std::string& st, BigInt min, BigInt m
         return false;
 
     return StringIsIntWithinRange(st, min, max, suffixLen);
+}
+
+void MultiplyStringLists(StringList& origList, const StringList& rhsList)
+{
+    if (origList.empty())
+    {
+        origList = rhsList;
+        return;
+    }
+
+    StringList newList;
+    for (const auto& lhs: origList)
+    {
+        for (const auto& rhs: rhsList)
+        {
+            newList.push_back(lhs + rhs);
+        }
+    }
+
+    origList.swap(newList);
 }
 
 
@@ -3853,7 +3877,7 @@ BigInt CalcExpression(Expression& expression, bool withAddPrecedence, bool verbo
             if (node.add)
             {
                 assert(!node.multiply);
-                assert(!withAddPrecedence); // all adds should have been eliminated up above
+                assert(!withAddPrecedence);   // all adds should have been eliminated up above
 
                 runningNumber += thisNumber;
             }
@@ -3906,6 +3930,171 @@ void RunOperationOrder()
     ReadFileLines("Day18Input.txt", mainData);
     printf("Main data, expression list sum = %lld\n", CalcExpressionListSum(mainData, false, false));
     printf("Main data, expression list sum with add precedence = %lld\n", CalcExpressionListSum(mainData, true, false));
+}
+
+
+////////////////////////////
+// Problem 19 - Monster Messages
+
+class MonsterMessages
+{
+public:
+    MonsterMessages(const char* fileName)
+    {
+        StringList fileLines;
+        ReadFileLines(fileName, fileLines);
+
+        m_ruleList.resize(fileLines.size());
+
+        BigInt lineIndex = 0;
+        while (!fileLines[lineIndex].empty())
+        {
+            BigInt ruleIndex = 0;
+            Rule rule;
+            ParseRule(fileLines[lineIndex], ruleIndex, rule);
+            SwapRules(m_ruleList[ruleIndex], rule);
+            ++lineIndex;
+            assert(lineIndex < (BigInt)fileLines.size());
+        }
+
+        ++lineIndex;
+        while (lineIndex < (BigInt)fileLines.size())
+        {
+            m_messageList.push_back(std::string());
+            m_messageList.back().swap(fileLines[lineIndex]);
+            ++lineIndex;
+        }
+    }
+
+    BigInt CalcNumMessagesMatchPrimeRule(bool verbose) const
+    {
+        // derive messages that match
+
+        UnorderedStringSet matchingSet;
+        DerivePrimeMatchingMessages(matchingSet);
+
+        if (verbose)
+        {
+            printf("Deriving matching messages:\n");
+            for (const auto& msg: matchingSet)
+            {
+                printf("  %s\n", msg.c_str());
+            }
+        }
+
+        // compare to messages in list
+
+        BigInt numMatches = 0;
+        for (const auto& message: m_messageList)
+        {
+            numMatches += matchingSet.count(message);
+        }
+
+        return numMatches;
+    }
+
+private:
+    struct Rule
+    {
+        char specificRule;
+        BigIntListList subRules;
+
+        Rule() : specificRule(0), subRules() {}
+    };
+
+    typedef std::vector<Rule> RuleList;
+
+    void ParseRule(const std::string& st, BigInt& index, Rule& rule)
+    {
+        StringList tokens;
+        Tokenize(st, tokens, ' ');
+        assert(tokens.size() >= 2);
+
+        const std::string& indexString = tokens[0];
+        assert(indexString[indexString.length() - 1] == ':');
+        index = atoll(indexString.c_str());
+
+        BigInt tokenIndex = 1;
+        if (tokens[tokenIndex][0] == '\"')
+        {
+            assert(tokens[tokenIndex].length() == 3);
+            assert(tokens[tokenIndex][2] == '\"');
+            rule.specificRule = tokens[tokenIndex][1];
+            return;
+        }
+
+        rule.subRules.push_back(BigIntList());
+        BigIntList* pCurrSubRule = &(rule.subRules.back());
+        for (; tokenIndex < (BigInt)tokens.size(); ++tokenIndex)
+        {
+            const std::string& token = tokens[tokenIndex];
+            if (token == "|")
+            {
+                rule.subRules.push_back(BigIntList());
+                pCurrSubRule = &(rule.subRules.back());
+            }
+            else
+            {
+                pCurrSubRule->push_back(atoll(token.c_str()));
+            }
+        }
+    }
+
+    static void SwapRules(Rule& lhs, Rule& rhs)
+    {
+        std::swap(lhs.specificRule, rhs.specificRule);
+        lhs.subRules.swap(rhs.subRules);
+    }
+
+    void DerivePrimeMatchingMessages(UnorderedStringSet& matchingSet) const
+    {
+        matchingSet.clear();
+
+        StringList stringList;
+        IterateDerivePrimeMatchingMessages(0, stringList);
+        for (const auto& st: stringList)
+        {
+            matchingSet.insert(st);
+        }
+    }
+
+    void IterateDerivePrimeMatchingMessages(BigInt ruleIndex, StringList& stringList) const
+    {
+        stringList.clear();
+        const Rule& rule = m_ruleList[ruleIndex];
+        if (rule.specificRule != '\0')
+        {
+            assert(rule.subRules.empty());
+            stringList.push_back(std::string());
+            stringList.back() += rule.specificRule;
+        }
+        else
+        {
+            for (const auto& subRule: rule.subRules)
+            {
+                StringList subStringList;
+                for (const BigInt subSubRuleIndex: subRule)
+                {
+                    StringList subSubStringList;
+                    IterateDerivePrimeMatchingMessages(subSubRuleIndex, subSubStringList);
+                    MultiplyStringLists(subStringList, subSubStringList);
+                }
+                stringList.insert(stringList.end(), subStringList.cbegin(), subStringList.cend());
+            }
+        }
+    }
+
+    RuleList m_ruleList;
+    StringList m_messageList;
+};
+
+void RunMonsterMessages()
+{
+    MonsterMessages testData("Day19TestInput.txt");
+    printf("Test data, num messages that completely match rule 0 = %lld\n", testData.CalcNumMessagesMatchPrimeRule(true));
+
+    MonsterMessages mainData("Day19Input.txt");
+    printf("Main data, num messages that completely match rule 0 = %lld\n", mainData.CalcNumMessagesMatchPrimeRule(false));
 }
 
 
@@ -3982,6 +4171,9 @@ int main(int argc, char** argv)
             break;
         case 18:
             RunOperationOrder();
+            break;
+        case 19:
+            RunMonsterMessages();
             break;
         default:
             printf("'%s' is not a valid problem number!\n\n", problemArg);
