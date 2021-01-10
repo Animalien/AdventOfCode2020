@@ -3971,7 +3971,7 @@ public:
         // derive messages that match
 
         UnorderedStringSet matchingSet;
-        DerivePrimeMatchingMessages(matchingSet);
+        DeriveMatchingMessages(0, matchingSet);
 
         if (verbose)
         {
@@ -3988,6 +3988,120 @@ public:
         for (const auto& message: m_messageList)
         {
             numMatches += matchingSet.count(message);
+        }
+
+        return numMatches;
+    }
+
+    void DeriveMatchingMessages(BigInt ruleIndex, UnorderedStringSet& matchingSet) const
+    {
+        matchingSet.clear();
+
+        StringList stringList;
+        IterateDeriveMatchingMessages(ruleIndex, stringList);
+        for (const auto& st: stringList)
+        {
+            matchingSet.insert(st);
+        }
+    }
+
+    void DeriveMatchingMessages(BigInt ruleIndex, StringList& stringList) const
+    {
+        IterateDeriveMatchingMessages(ruleIndex, stringList);
+    }
+
+    BigInt CalcNumMessagesMatchingSpecialRuleComposite() const
+    {
+        // Here we are doing the matchine messages check, but with some rules changes.
+        // 
+        // Rule 0 did consist and still consists of rules 8 and 11 in succession.
+        //
+        // But now:
+        // Rule 8, which was simply 42, now becomes 42 OR 42 and 8.
+        // Rule 11, which was 42 and 31, now becomes 42 31 OR 42 11 31.
+        //
+        // With these rule changes, it turns out rule 0 becomes:
+        //    <match rule 42 N1 times> + <match rule 42 N2 times> + <match rule 31 N2 times>
+        //
+        // It also turns out that all of the possible values from rules 31 and 42 are the same length.
+        // So in order to count the number of message matching this new rule 0, we
+        // simply need to segment out the message and make sure the segments match the above
+        // pattern (with N1 + N2 + N2 = full length of message, and all length numbers being
+        // an even multiple of the segment length).
+
+        const BigInt ruleLeft = 42;
+        UnorderedStringSet leftStringSet;
+        DeriveMatchingMessages(ruleLeft, leftStringSet);
+        const BigInt segmentLength = (leftStringSet.begin())->length();
+        for (const auto& st: leftStringSet)
+            assert(st.length() == segmentLength);
+        printf("Derived %lld left rule %lld matching strings\n", leftStringSet.size(), ruleLeft);
+
+        const BigInt ruleRight = 31;
+        UnorderedStringSet rightStringSet;
+        DeriveMatchingMessages(ruleRight, rightStringSet);
+        for (const auto& st: rightStringSet)
+            assert(st.length() == segmentLength);
+        printf("Derived %lld right rule %lld matching strings\n", rightStringSet.size(), ruleRight);
+
+        BigInt numMatches = 0;
+
+        printf("Searching messages for composite matches\n");
+        std::string segment(segmentLength, ' ');
+        for (const auto& message: m_messageList)
+        {
+            const BigInt messageLength = message.length();
+
+            const lldiv_t div = lldiv(messageLength, segmentLength);
+
+            if (div.rem != 0)
+                continue;
+
+            const BigInt numSegments = div.quot;
+            const BigInt maxNumRightSegments = (numSegments - 1) / 2;
+
+            BigInt segmentIndex = numSegments - 1;
+            const BigInt earliestRightSegmentIndex = numSegments - maxNumRightSegments;
+            for (; segmentIndex >= earliestRightSegmentIndex; --segmentIndex)
+            {
+                const auto segmentStartIter = std::next(message.begin(), segmentIndex * segmentLength);
+                const auto segmentEndIter = std::next(segmentStartIter, segmentLength);
+                std::copy(segmentStartIter, segmentEndIter, segment.begin());
+
+                if (rightStringSet.count(segment) <= 0)
+                    break;
+            }
+
+            const BigInt numRightSegments = numSegments - segmentIndex - 1;
+            if (numRightSegments <= 0)
+                continue;
+
+            for (; segmentIndex >= 0; --segmentIndex)
+            {
+                const auto segmentStartIter = std::next(message.begin(), segmentIndex * segmentLength);
+                const auto segmentEndIter = std::next(segmentStartIter, segmentLength);
+                std::copy(segmentStartIter, segmentEndIter, segment.begin());
+
+                if (leftStringSet.count(segment) <= 0)
+                    break;
+            }
+
+            if (segmentIndex < 0)
+            {
+                ++numMatches;
+                printf(
+                    "  %s is valid, consists of %lld left segments + %lld right segments, full length = %lld, segmentIndex = %lld\n",
+                    message.c_str(),
+                    numSegments - numRightSegments,
+                    numRightSegments,
+                    message.length(),
+                    segmentIndex);
+            }
+            else
+            {
+                printf(
+                    "  %s is not valid, length = %lld, segmentIndex = %lld\n", message.c_str(), message.length(), segmentIndex);
+            }
         }
 
         return numMatches;
@@ -4046,19 +4160,7 @@ private:
         lhs.subRules.swap(rhs.subRules);
     }
 
-    void DerivePrimeMatchingMessages(UnorderedStringSet& matchingSet) const
-    {
-        matchingSet.clear();
-
-        StringList stringList;
-        IterateDerivePrimeMatchingMessages(0, stringList);
-        for (const auto& st: stringList)
-        {
-            matchingSet.insert(st);
-        }
-    }
-
-    void IterateDerivePrimeMatchingMessages(BigInt ruleIndex, StringList& stringList) const
+    void IterateDeriveMatchingMessages(BigInt ruleIndex, StringList& stringList) const
     {
         stringList.clear();
         const Rule& rule = m_ruleList[ruleIndex];
@@ -4076,7 +4178,7 @@ private:
                 for (const BigInt subSubRuleIndex: subRule)
                 {
                     StringList subSubStringList;
-                    IterateDerivePrimeMatchingMessages(subSubRuleIndex, subSubStringList);
+                    IterateDeriveMatchingMessages(subSubRuleIndex, subSubStringList);
                     MultiplyStringLists(subStringList, subSubStringList);
                 }
                 stringList.insert(stringList.end(), subStringList.cbegin(), subStringList.cend());
@@ -4094,7 +4196,16 @@ void RunMonsterMessages()
     printf("Test data, num messages that completely match rule 0 = %lld\n", testData.CalcNumMessagesMatchPrimeRule(true));
 
     MonsterMessages mainData("Day19Input.txt");
-    printf("Main data, num messages that completely match rule 0 = %lld\n", mainData.CalcNumMessagesMatchPrimeRule(false));
+    printf("Main data, num messages that completely match rule 0 = %lld\n\n", mainData.CalcNumMessagesMatchPrimeRule(false));
+
+    MonsterMessages testDataB("Day19TestInputB.txt");
+    printf(
+        "Test data B num messages that match rule 0 with replacement rules = %lld\n",
+        testDataB.CalcNumMessagesMatchingSpecialRuleComposite());
+
+    printf(
+        "Main data num messages that match rule 0 with replacement rules = %lld\n",
+        mainData.CalcNumMessagesMatchingSpecialRuleComposite());
 }
 
 
