@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -4013,7 +4014,7 @@ public:
     BigInt CalcNumMessagesMatchingSpecialRuleComposite() const
     {
         // Here we are doing the matchine messages check, but with some rules changes.
-        // 
+        //
         // Rule 0 did consist and still consists of rules 8 and 11 in succession.
         //
         // But now:
@@ -4211,6 +4212,155 @@ void RunMonsterMessages()
 
 
 ////////////////////////////
+// Problem 20 - Jurassic Jigsaw
+
+class JurassicJigsaw
+{
+public:
+    JurassicJigsaw(const char* fileName)
+    {
+        StringList fileLines;
+        ReadFileLines(fileName, fileLines);
+
+        BigInt lineIndex = 0;
+        while (lineIndex < (BigInt)fileLines.size())
+        {
+            m_tileList.push_back(Tile());
+            Tile& tile = m_tileList.back();
+
+            StringList tokens;
+            Tokenize(fileLines[lineIndex], tokens, ' ');
+            assert(tokens.size() == 2);
+            assert(tokens[0] == "Tile");
+            tile.id = atoll(tokens[1].c_str());
+            ++lineIndex;
+
+            while ((lineIndex < (BigInt)fileLines.size()) && !fileLines[lineIndex].empty())
+            {
+                tile.data.push_back(fileLines[lineIndex]);
+                ++lineIndex;
+            }
+
+            ++lineIndex;
+        }
+
+        for (auto& tile: m_tileList)
+        {
+            RegisterTileEdges(tile);
+        }
+    }
+
+    BigInt CalcCornerTileIdProduct() const
+    {
+        BigInt product = 1;
+        for (const auto& tile: m_tileList)
+        {
+            BigInt numLoneEdges = 0;
+            for (const BigInt edgeIndex: tile.edgeList)
+            {
+                if (m_edgeTileList[edgeIndex].size() == 1)
+                    ++numLoneEdges;
+            }
+            if (numLoneEdges == 2)
+            {
+                product *= tile.id;
+            }
+        }
+        return product;
+    }
+
+private:
+    struct Tile
+    {
+        BigInt id;
+        StringList data;
+        BigIntList edgeList;
+
+        Tile() : id(0), data(), edgeList() {}
+    };
+
+    typedef std::vector<Tile> TileList;
+    TileList m_tileList;
+
+    void RegisterTileEdges(Tile& tile)
+    {
+        StringList edges;
+        GetTileEdges(tile, edges);
+
+        for (const auto& edge: edges)
+        {
+            BigInt edgeIndex;
+            RegisterTileEdge(tile.id, edge, edgeIndex);
+            tile.edgeList.push_back(edgeIndex);
+        }
+    }
+
+    void RegisterTileEdge(BigInt tileId, const std::string& edge, BigInt& edgeIndex)
+    {
+        const auto findIter1 = m_edgeMap.find(edge);
+        if (findIter1 != m_edgeMap.end())
+        {
+            edgeIndex = findIter1->second;
+            BigIntList& edgeTileList = m_edgeTileList[edgeIndex];
+            edgeTileList.push_back(tileId);
+        }
+        else
+        {
+            std::string reversedEdge = edge;
+            std::reverse(reversedEdge.begin(), reversedEdge.end());
+
+            const auto findIter2 = m_edgeMap.find(reversedEdge);
+            if (findIter2 != m_edgeMap.end())
+            {
+                edgeIndex = findIter2->second;
+                BigIntList& edgeTileList = m_edgeTileList[edgeIndex];
+                edgeTileList.push_back(tileId);
+            }
+            else
+            {
+                edgeIndex = m_edgeTileList.size();
+                m_edgeMap.insert(std::pair<std::string, BigInt>(edge, edgeIndex));
+                m_edgeTileList.push_back(BigIntList());
+                m_edgeTileList.back().push_back(tileId);
+            }
+        }
+    }
+
+    void GetTileEdges(const Tile& tile, StringList& edges)
+    {
+        edges.clear();
+        edges.push_back(tile.data[0]);
+        edges.push_back(tile.data[tile.data.size() - 1]);
+
+        std::string leftVertEdge, rightVertEdge;
+        for (const auto& tileLine: tile.data)
+        {
+            leftVertEdge += tileLine[0];
+            rightVertEdge += tileLine[tileLine.length() - 1];
+        }
+
+        edges.push_back(leftVertEdge);
+        edges.push_back(rightVertEdge);
+    }
+
+    typedef std::unordered_map<std::string, BigInt> EdgeMap;
+    typedef std::vector<BigIntList> EdgeTileList;
+    EdgeMap m_edgeMap;
+    EdgeTileList m_edgeTileList;
+};
+
+void RunJurassicJigsaw()
+{
+    JurassicJigsaw testData("Day20TestInput.txt");
+    printf("Test data corner tile id product = %lld\n", testData.CalcCornerTileIdProduct());
+
+    JurassicJigsaw mainData("Day20Input.txt");
+    printf("Main data corner tile id product = %lld\n", mainData.CalcCornerTileIdProduct());
+}
+
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -4285,6 +4435,9 @@ int main(int argc, char** argv)
             break;
         case 19:
             RunMonsterMessages();
+            break;
+        case 20:
+            RunJurassicJigsaw();
             break;
         default:
             printf("'%s' is not a valid problem number!\n\n", problemArg);
