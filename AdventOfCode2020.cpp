@@ -1,6 +1,7 @@
 // Hi, this is my AdventOfCode 2020 stuff
 
 #include <assert.h>
+#include <deque>
 #include <limits.h>
 #include <map>
 #include <set>
@@ -26,6 +27,7 @@ typedef std::vector<BigInt> BigIntList;
 typedef std::vector<BigIntList> BigIntListList;
 typedef std::map<BigInt, BigInt> BigIntMap;
 typedef std::set<BigInt> BigIntSet;
+typedef std::deque<BigInt> BigIntDeque;
 
 typedef unsigned long long BigUInt;
 
@@ -5046,6 +5048,148 @@ void RunAllergenAssessment()
 
 
 ////////////////////////////
+// Problem 22 - Crab Combat
+
+class CrabCombat
+{
+public:
+    CrabCombat(const char* fileName)
+    {
+        StringList fileLines;
+        ReadFileLines(fileName, fileLines);
+
+        BigInt lineIndex = 0;
+        assert(fileLines[lineIndex] == "Player 1:");
+        ++lineIndex;
+
+        while ((lineIndex < (BigInt)fileLines.size()) && !fileLines[lineIndex].empty())
+        {
+            m_player1Deck.push_back(atoll(fileLines[lineIndex].c_str()));
+            ++lineIndex;
+        }
+
+        assert(((lineIndex < (BigInt)fileLines.size()) && fileLines[lineIndex].empty()));
+        ++lineIndex;
+
+        assert(fileLines[lineIndex] == "Player 2:");
+        ++lineIndex;
+
+        while ((lineIndex < (BigInt)fileLines.size()) && !fileLines[lineIndex].empty())
+        {
+            m_player2Deck.push_back(atoll(fileLines[lineIndex].c_str()));
+            ++lineIndex;
+        }
+    }
+
+    void PlayGame(bool verbose)
+    {
+        BigInt round = 1;
+        if (verbose)
+            printf("Playing game:\n\n");
+        while (!m_player1Deck.empty() && !m_player2Deck.empty())
+        {
+            const BigInt player1Plays = m_player1Deck.front();
+            const BigInt player2Plays = m_player2Deck.front();
+
+            if (verbose)
+            {
+                printf("-- Round %lld --\n", round);
+                printf("Player 1's deck: ");
+                for (const BigInt card: m_player1Deck)
+                    printf("%lld ", card);
+                printf("\nPlayer 2's deck: ");
+                for (const BigInt card: m_player2Deck)
+                    printf("%lld ", card);
+                printf("\nPlayer 1 plays: %lld\n", player1Plays);
+                printf("Player 2 plays: %lld\n", player2Plays);
+            }
+
+            m_player1Deck.pop_front();
+            m_player2Deck.pop_front();
+
+            if (player1Plays > player2Plays)
+            {
+                m_player1Deck.push_back(player1Plays);
+                m_player1Deck.push_back(player2Plays);
+
+                if (verbose)
+                    printf("Player 1 wins the round!\n\n");
+            }
+            else
+            {
+                assert(player2Plays > player1Plays);
+
+                m_player2Deck.push_back(player2Plays);
+                m_player2Deck.push_back(player1Plays);
+
+                if (verbose)
+                    printf("Player 2 wins the round!\n\n");
+            }
+
+            ++round;
+        }
+
+        if (verbose)
+        {
+            printf("== Post-game results ==\n");
+
+            printf("Player 1's deck: ");
+            for (const BigInt card: m_player1Deck)
+                printf("%lld ", card);
+            printf("\nPlayer 2's deck: ");
+            for (const BigInt card: m_player2Deck)
+                printf("%lld ", card);
+            printf("\n\n");
+
+            if (m_player1Deck.empty())
+                printf("Player 2 wins the game!\n\n");
+            else
+            {
+                assert(m_player2Deck.empty());
+                printf("Player 1 wins the game!\n\n");
+            }
+        }
+    }
+
+    BigInt CalcWinningPlayerScore() const
+    {
+        assert(m_player1Deck.empty() || m_player2Deck.empty());
+
+        const BigIntDeque& winningPlayerDeck = m_player2Deck.empty() ? m_player1Deck : m_player2Deck;
+
+        BigInt score = 0;
+        BigInt index = (BigInt)winningPlayerDeck.size();
+
+        for (const BigInt card: winningPlayerDeck)
+        {
+            score += index * card;
+            --index;
+        }
+
+        assert(index == 0);
+
+        return score;
+    }
+
+private:
+    BigIntDeque m_player1Deck;
+    BigIntDeque m_player2Deck;
+};
+
+void RunCrabCombat()
+{
+    CrabCombat testData("Day22TestInput.txt");
+    testData.PlayGame(true);
+    printf("Test data, winning player score = %lld\n", testData.CalcWinningPlayerScore());
+
+    CrabCombat mainData("Day22Input.txt");
+    mainData.PlayGame(false);
+    printf("Main data, winning player score = %lld\n", mainData.CalcWinningPlayerScore());
+}
+
+
+
+////////////////////////////
 ////////////////////////////
 // Main
 
@@ -5126,6 +5270,9 @@ int main(int argc, char** argv)
             break;
         case 21:
             RunAllergenAssessment();
+            break;
+        case 22:
+            RunCrabCombat();
             break;
         default:
             printf("'%s' is not a valid problem number!\n\n", problemArg);
