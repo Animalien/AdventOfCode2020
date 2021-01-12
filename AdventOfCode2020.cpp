@@ -4219,7 +4219,7 @@ void RunMonsterMessages()
 class JurassicJigsaw
 {
 public:
-    JurassicJigsaw(const char* fileName)
+    JurassicJigsaw(const char* fileName) : m_edgeMap(), m_edgeTileList(), m_image(), m_imageEdgeSize(0)
     {
         StringList fileLines;
         ReadFileLines(fileName, fileLines);
@@ -4371,8 +4371,8 @@ public:
             printf("\n\nImage tiles arranged (before trimming and finalizing):\n\n");
 
         const BigInt tileEdgeSize = m_tileList[0].data.size();
-        const BigInt imageEdgeSize = numTilesPerSide * (tileEdgeSize - 2);
-        const BigInt imageSize = imageEdgeSize * imageEdgeSize;
+        m_imageEdgeSize = numTilesPerSide * (tileEdgeSize - 2);
+        const BigInt imageSize = m_imageEdgeSize * m_imageEdgeSize;
         m_image.reserve(imageSize);
         for (BigInt tileY = 0; tileY < numTilesPerSide; ++tileY)
         {
@@ -4413,22 +4413,164 @@ public:
         if (verbose)
         {
             printf("\n\nComplete assembled image:\n\n");
-
-            for (BigInt y = 0; y < imageEdgeSize; ++y)
-            {
-                for (BigInt x = 0; x < imageEdgeSize; ++x)
-                {
-                    printf("%c", m_image[y * imageEdgeSize + x]);
-                }
-                printf("\n");
-            }
-            printf("\n\n");
+            PrintImage();
         }
     }
 
-    void PrintImage() {}
+    void PrintImage() const { PrintImage(m_image); }
+
+    BigInt CountOccurrencesOfPattern(const StringList& pattern, bool markOccurrences, bool verbose)
+    {
+        std::string imageCopy;
+        if (verbose && !markOccurrences)
+            imageCopy = m_image;
+
+        const BigInt patternSizeX = pattern[0].length();
+        const BigInt patternSizeY = pattern.size();
+
+        const BigInt lastX = m_imageEdgeSize - patternSizeX;
+        const BigInt lastY = m_imageEdgeSize - patternSizeY;
+
+        BigInt count = 0;
+        for (BigInt y = 0; y <= lastY; ++y)
+        {
+            for (BigInt x = 0; x <= lastX; ++x)
+            {
+                bool matchFailed = false;
+                for (BigInt yy = 0; !matchFailed && (yy < patternSizeY); ++yy)
+                {
+                    for (BigInt xx = 0; !matchFailed && (xx < patternSizeX); ++xx)
+                    {
+                        const char patternChar = pattern[yy][xx];
+
+                        if (patternChar == ' ')
+                            continue;
+
+                        const BigInt imageCharIndex = (y + yy) * m_imageEdgeSize + x + xx;
+                        const char imageChar = m_image[imageCharIndex];
+
+                        if ((imageChar != patternChar) && (imageChar != MARK_OCCURRENCE_CHAR))
+                            matchFailed = true;
+                    }
+                }
+                if (!matchFailed)
+                {
+                    ++count;
+
+                    if (verbose || markOccurrences)
+                    {
+                        for (BigInt yy = 0; !matchFailed && (yy < patternSizeY); ++yy)
+                        {
+                            for (BigInt xx = 0; !matchFailed && (xx < patternSizeX); ++xx)
+                            {
+                                const char patternChar = pattern[yy][xx];
+
+                                if (patternChar == ' ')
+                                    continue;
+
+                                const BigInt imageCharIndex = (y + yy) * m_imageEdgeSize + x + xx;
+                                if (markOccurrences)
+                                    m_image[imageCharIndex] = MARK_OCCURRENCE_CHAR;
+                                else
+                                    imageCopy[imageCharIndex] = MARK_OCCURRENCE_CHAR;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (verbose)
+        {
+            printf("Image with found pattern occurences:\n");
+            if (markOccurrences)
+                PrintImage();
+            else
+                PrintImage(imageCopy);
+        }
+
+        return count;
+    }
+
+    void MarkOccurencesOfPatternAllowTransform(const StringList& pattern, bool verbose)
+    {
+        if (verbose)
+            printf("Checking for occurrences of pattern...\n");
+
+        BigInt count = 0;
+        for (BigInt i = 0; i < 4; ++i)
+        {
+            count = CountOccurrencesOfPattern(pattern, true, false);
+            if (count > 0)
+                break;
+
+            if (verbose)
+                printf("Occurrences of pattern not found. Rotating...\n");
+
+            Rotate();
+        }
+
+        if (count <= 0)
+        {
+            if (verbose)
+                printf("Occurrences of pattern not found. Flipping...\n");
+
+            Flip();
+            for (BigInt i = 0; i < 4; ++i)
+            {
+                count = CountOccurrencesOfPattern(pattern, true, false);
+                if (count > 0)
+                    break;
+
+                if (verbose)
+                    printf("Occurrences of pattern not found. Rotating...\n");
+
+                Rotate();
+            }
+        }
+
+        if (verbose)
+            printf("%lld occurrences found!\n", count);
+        PrintImage();
+    }
+
+    void Rotate()
+    {
+        std::string imageCopy;
+        imageCopy.reserve(m_image.length());
+
+        for (BigInt x = 0; x < m_imageEdgeSize; ++x)
+        {
+            for (BigInt y = m_imageEdgeSize - 1; y >= 0; --y)
+            {
+                imageCopy += m_image[y * m_imageEdgeSize + x];
+            }
+        }
+
+        m_image.swap(imageCopy);
+    }
+
+    void Flip()
+    {
+        std::string imageCopy;
+        imageCopy.reserve(m_image.length());
+
+        for (BigInt y = 0; y < m_imageEdgeSize; ++y)
+        {
+            for (BigInt x = m_imageEdgeSize - 1; x >= 0; --x)
+            {
+                imageCopy += m_image[y * m_imageEdgeSize + x];
+            }
+        }
+
+        m_image.swap(imageCopy);
+    }
+
+    BigInt CountCharsInImage(char ch) const { return std::count(m_image.cbegin(), m_image.cend(), ch); }
 
 private:
+    static const char MARK_OCCURRENCE_CHAR = 'O';
+
     struct Tile
     {
         BigInt id;
@@ -4637,24 +4779,53 @@ private:
         y = newY;
     }
 
+    void PrintImage(const std::string& image) const
+    {
+        for (BigInt y = 0; y < m_imageEdgeSize; ++y)
+        {
+            for (BigInt x = 0; x < m_imageEdgeSize; ++x)
+            {
+                printf("%c", image[y * m_imageEdgeSize + x]);
+            }
+            printf("\n");
+        }
+        printf("\n\n");
+    }
+
     typedef std::unordered_map<std::string, BigInt> EdgeMap;
     typedef BigIntListList EdgeTileList;
     EdgeMap m_edgeMap;
     EdgeTileList m_edgeTileList;
 
     std::string m_image;
+    BigInt m_imageEdgeSize;
 };
 
 void RunJurassicJigsaw()
 {
+    static const char CHARS_TO_COUNT = '#';
+
+    StringList seaMonster;
+    ReadFileLines("Day20SeaMonster.txt", seaMonster);
+
     JurassicJigsaw testData("Day20TestInput.txt");
     printf("Test data corner tile id product = %lld\n", testData.CalcCornerTileIdProduct());
     testData.AssembleImage(true);
+    testData.MarkOccurencesOfPatternAllowTransform(seaMonster, true);
+    printf(
+        "Test data count of %c chars after marking sea monster patterns = %lld\n",
+        CHARS_TO_COUNT,
+        testData.CountCharsInImage(CHARS_TO_COUNT));
 
     JurassicJigsaw mainData("Day20Input.txt");
     printf("Main data corner tile id product = %lld\n", mainData.CalcCornerTileIdProduct());
+    mainData.AssembleImage(false);
+    mainData.MarkOccurencesOfPatternAllowTransform(seaMonster, true);
+    printf(
+        "Main data count of %c chars after marking sea monster patterns = %lld\n",
+        CHARS_TO_COUNT,
+        mainData.CountCharsInImage(CHARS_TO_COUNT));
 }
-
 
 
 ////////////////////////////
