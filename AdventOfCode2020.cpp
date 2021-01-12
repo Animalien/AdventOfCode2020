@@ -18,7 +18,7 @@
 // Shared tools
 
 ////////////////////////////
-// Numeric
+// Basic Types
 
 typedef long long BigInt;
 typedef std::initializer_list<BigInt> BigIntInitList;
@@ -32,6 +32,8 @@ typedef unsigned long long BigUInt;
 const BigInt MAX_BIG_INT = LLONG_MAX;
 const BigInt MIN_BIG_INT = LLONG_MIN;
 const BigInt MAX_BIG_UINT = ULLONG_MAX;
+
+typedef std::vector<bool> BoolList;
 
 
 ////////////////////////////
@@ -4269,6 +4271,238 @@ public:
         return product;
     }
 
+    void AssembleImage1(bool verbose)
+    {
+        if (verbose)
+        {
+            printf("Tiles:\n");
+            for (const auto& tile: m_tileList)
+            {
+                printf("  Tile id %lld, has edges:\n", tile.id);
+                for (const BigInt edgeIndex: tile.edgeList)
+                {
+                    printf("    edge index %lld, which is shared by tiles: ", edgeIndex);
+                    const auto& tilesList = m_edgeTileList[edgeIndex];
+                    for (const BigInt tileId: tilesList)
+                    {
+                        printf("%lld ", tileId);
+                    }
+                    printf("\n");
+                }
+            }
+        }
+
+        const BigInt numTiles = m_tileList.size();
+
+        const double numTilesPerSideDouble = sqrt((double)numTiles);
+        const BigInt numTilesPerSide = (BigInt)numTilesPerSideDouble;
+        assert((double)numTilesPerSide == numTilesPerSideDouble);
+        const BigInt lastSideIndex = numTilesPerSide - 1;
+
+        BoolList tilesUsed(m_tileList.size(), false);
+        BigIntList imageTileIndices(m_tileList.size(), -1);
+
+        BigIntList edgeListToCheck(NUM_EDGES, UNKNOWN_EDGE);
+        for (BigInt y = 0; y <= lastSideIndex; ++y)
+        {
+            for (BigInt x = 0; x <= lastSideIndex; ++x)
+            {
+                const BigInt imageTileIndexIndex = y * numTilesPerSide + x;
+
+                edgeListToCheck[TOP_EDGE] = LONELY_EDGE;
+                if (y > 0)
+                    edgeListToCheck[TOP_EDGE] =
+                        m_tileList[imageTileIndices[imageTileIndexIndex - numTilesPerSide]].edgeList[BOTTOM_EDGE];
+
+                edgeListToCheck[LEFT_EDGE] = LONELY_EDGE;
+                if (x > 0)
+                    edgeListToCheck[LEFT_EDGE] = m_tileList[imageTileIndices[imageTileIndexIndex - 1]].edgeList[RIGHT_EDGE];
+
+                edgeListToCheck[RIGHT_EDGE] = UNKNOWN_EDGE;
+                if (x >= lastSideIndex)
+                    edgeListToCheck[RIGHT_EDGE] = LONELY_EDGE;
+
+                edgeListToCheck[BOTTOM_EDGE] = UNKNOWN_EDGE;
+                if (y >= lastSideIndex)
+                    edgeListToCheck[BOTTOM_EDGE] = LONELY_EDGE;
+
+                BigInt foundTileIndex = -1;
+                const bool foundTile = FindTileWithEdges1(edgeListToCheck, foundTileIndex);
+                assert(foundTile);
+                assert(foundTileIndex >= 0);
+                assert(!tilesUsed[foundTileIndex]);
+
+                tilesUsed[foundTileIndex] = true;
+                imageTileIndices[imageTileIndexIndex] = foundTileIndex;
+
+                /*
+                BigInt moreOptions = 0;
+                BigInt foundAnotherTileIndex = foundTileIndex;
+                for (;;)
+                {
+                    const bool foundAnotherTile =
+                        FindTileWithEdges1(edgeListToCheck, foundAnotherTileIndex, foundAnotherTileIndex + 1);
+                    if (!foundAnotherTile)
+                        break;
+
+                    ++moreOptions;
+                }
+                assert(moreOptions == 0);
+                */
+            }
+        }
+    }
+
+    void AssembleImage2(bool verbose)
+    {
+        if (verbose)
+        {
+            printf("Tiles:\n");
+            for (const auto& tile: m_tileList)
+            {
+                printf("  Tile id %lld, has edges:\n", tile.id);
+                for (const BigInt edgeIndex: tile.edgeList)
+                {
+                    printf("    edge index %lld, which is shared by tiles: ", edgeIndex);
+                    const auto& tilesList = m_edgeTileList[edgeIndex];
+                    if (tilesList.size() == 1)
+                    {
+                        assert(tilesList[0] == tile.id);
+                        printf("<none>\n");
+                    }
+                    else
+                    {
+                        for (const BigInt tileId: tilesList)
+                        {
+                            if (tileId == tile.id)
+                                continue;
+                            printf("%lld ", tileId);
+                        }
+                        printf("\n");
+                    }
+                }
+            }
+        }
+
+        const BigInt numTiles = m_tileList.size();
+
+        const double numTilesPerSideDouble = sqrt((double)numTiles);
+        const BigInt numTilesPerSide = (BigInt)numTilesPerSideDouble;
+        assert((double)numTilesPerSide == numTilesPerSideDouble);
+        const BigInt lastSideIndex = numTilesPerSide - 1;
+
+        BoolList tilesUsed(m_tileList.size(), false);
+        BigIntList imageTileIndices(m_tileList.size(), -1);
+        BigIntList tileRotations(m_tileList.size(), 0);
+        BoolList tilesFlipped(m_tileList.size(), false);
+
+        BigIntList edgeListToCheck(NUM_EDGES, UNKNOWN_EDGE);
+        for (BigInt y = 0; y <= lastSideIndex; ++y)
+        {
+            for (BigInt x = 0; x <= lastSideIndex; ++x)
+            {
+                const BigInt imageTileIndexIndex = y * numTilesPerSide + x;
+
+                edgeListToCheck[TOP_EDGE] = LONELY_EDGE;
+                if (y > 0)
+                {
+                    const BigInt aboveTileIndexIndex = imageTileIndexIndex - numTilesPerSide;
+                    edgeListToCheck[TOP_EDGE] = GetAlreadyPlacedTileEdge(
+                        imageTileIndices[aboveTileIndexIndex],
+                        tileRotations[aboveTileIndexIndex],
+                        tilesFlipped[aboveTileIndexIndex],
+                        BOTTOM_EDGE);
+                }
+
+                edgeListToCheck[LEFT_EDGE] = LONELY_EDGE;
+                if (x > 0)
+                {
+                    const BigInt leftwardTileIndexIndex = imageTileIndexIndex - 1;
+                    edgeListToCheck[LEFT_EDGE] = GetAlreadyPlacedTileEdge(
+                        imageTileIndices[leftwardTileIndexIndex],
+                        tileRotations[leftwardTileIndexIndex],
+                        tilesFlipped[leftwardTileIndexIndex],
+                        RIGHT_EDGE);
+                }
+
+                edgeListToCheck[RIGHT_EDGE] = UNKNOWN_EDGE;
+                if (x >= lastSideIndex)
+                    edgeListToCheck[RIGHT_EDGE] = LONELY_EDGE;
+
+                edgeListToCheck[BOTTOM_EDGE] = UNKNOWN_EDGE;
+                if (y >= lastSideIndex)
+                    edgeListToCheck[BOTTOM_EDGE] = LONELY_EDGE;
+
+                BigInt foundTileIndex = -1;
+                BigInt startIndex = 0;
+                BigInt rotated = 0;
+                bool flipped = false;
+                for (;;)
+                {
+                    const bool foundTile = FindTileWithEdges2(edgeListToCheck, foundTileIndex, rotated, flipped, startIndex);
+                    assert(foundTile);
+                    assert(foundTileIndex >= 0);
+
+                    if (!tilesUsed[foundTileIndex])
+                        break;
+
+                    startIndex = foundTileIndex + 1;
+                }
+
+                tilesUsed[foundTileIndex] = true;
+                imageTileIndices[imageTileIndexIndex] = foundTileIndex;
+                tileRotations[imageTileIndexIndex] = rotated;
+                tilesFlipped[imageTileIndexIndex] = flipped;
+
+                /*
+                BigInt moreOptions = 0;
+                BigInt foundAnotherTileIndex = foundTileIndex;
+                for (;;)
+                {
+                    const bool foundAnotherTile =
+                        FindTileWithEdges2(edgeListToCheck, foundAnotherTileIndex, rotated, flipped, foundAnotherTileIndex + 1);
+                    if (!foundAnotherTile)
+                        break;
+
+                    ++moreOptions;
+                }
+                assert((imageTileIndexIndex <= 1) || (moreOptions == 0));
+                */
+            }
+        }
+
+        if (verbose)
+        {
+            printf("\n\nImage:\n\n");
+
+            const BigInt tileEdgeSize = m_tileList[0].data.size();
+
+            for (BigInt tileY = 0; tileY < numTilesPerSide; ++tileY)
+            {
+                for (BigInt y = 0; y < tileEdgeSize; ++y)
+                {
+                    for (BigInt tileX = 0; tileX < numTilesPerSide; ++tileX)
+                    {
+                        const BigInt tileIndexIndex = tileY * numTilesPerSide + tileX;
+                        const BigInt tileIndex = imageTileIndices[tileIndexIndex];
+                        const BigInt rotated = tileRotations[tileIndexIndex];
+                        const bool flipped = tilesFlipped[tileIndexIndex];
+
+                        for (BigInt x = 0; x < tileEdgeSize; ++x)
+                        {
+                            printf("%c", GetCharInPlacedTile(tileIndex, rotated, flipped, x, y));
+                        }
+                        printf(" ");
+                    }
+                    printf("\n");
+                }
+                printf("\n\n");
+            }
+        }
+    }
+
+    void PrintImage() {}
+
 private:
     struct Tile
     {
@@ -4326,11 +4560,20 @@ private:
         }
     }
 
+    enum Edges
+    {
+        TOP_EDGE,
+        RIGHT_EDGE,
+        BOTTOM_EDGE,
+        LEFT_EDGE,
+        NUM_EDGES,
+    };
     void GetTileEdges(const Tile& tile, StringList& edges)
     {
-        edges.clear();
-        edges.push_back(tile.data[0]);
-        edges.push_back(tile.data[tile.data.size() - 1]);
+        edges.resize(NUM_EDGES);
+
+        edges[TOP_EDGE] = tile.data[0];
+        edges[BOTTOM_EDGE] = tile.data[tile.data.size() - 1];
 
         std::string leftVertEdge, rightVertEdge;
         for (const auto& tileLine: tile.data)
@@ -4339,20 +4582,182 @@ private:
             rightVertEdge += tileLine[tileLine.length() - 1];
         }
 
-        edges.push_back(leftVertEdge);
-        edges.push_back(rightVertEdge);
+        edges[LEFT_EDGE] = leftVertEdge;
+        edges[RIGHT_EDGE] = rightVertEdge;
+    }
+
+    static const BigInt LONELY_EDGE = -1;
+    static const BigInt UNKNOWN_EDGE = -2;
+
+    bool FindTileWithEdges1(const BigIntList& edgeList, BigInt& tileIndex, BigInt startIndex = 0) const
+    {
+        static BigIntList thisTileEdgeList(4, UNKNOWN_EDGE);
+        for (tileIndex = startIndex; tileIndex < (BigInt)m_tileList.size(); ++tileIndex)
+        {
+            const Tile& tile = m_tileList[tileIndex];
+
+            for (BigInt edge = TOP_EDGE; edge < NUM_EDGES; ++edge)
+            {
+                if (m_edgeTileList[tile.edgeList[edge]].size() == 1)
+                    thisTileEdgeList[edge] = LONELY_EDGE;
+                else
+                    thisTileEdgeList[edge] = tile.edgeList[edge];
+            }
+
+            if (DoEdgeListsMatch1(edgeList, thisTileEdgeList))
+                return true;
+        }
+
+        return false;
+    }
+
+    bool FindTileWithEdges2(
+        const BigIntList& edgeList, BigInt& tileIndex, BigInt& rotated, bool& flipped, BigInt startIndex = 0) const
+    {
+        static BigIntList thisTileEdgeList(4, UNKNOWN_EDGE);
+        for (tileIndex = startIndex; tileIndex < (BigInt)m_tileList.size(); ++tileIndex)
+        {
+            const Tile& tile = m_tileList[tileIndex];
+
+            for (BigInt edge = TOP_EDGE; edge < NUM_EDGES; ++edge)
+            {
+                if (m_edgeTileList[tile.edgeList[edge]].size() == 1)
+                    thisTileEdgeList[edge] = LONELY_EDGE;
+                else
+                    thisTileEdgeList[edge] = tile.edgeList[edge];
+            }
+
+            if (DoEdgeListsMatch2(edgeList, thisTileEdgeList, rotated, flipped))
+                return true;
+        }
+
+        return false;
+    }
+
+    static bool DoEdgeListsMatch1(const BigIntList& lhs, const BigIntList& rhs)
+    {
+        const BigInt leftLonelyEdgeCount = std::count(lhs.cbegin(), lhs.cend(), LONELY_EDGE);
+        const BigInt rightLonelyEdgeCount = std::count(rhs.cbegin(), rhs.cend(), LONELY_EDGE);
+        if (leftLonelyEdgeCount != rightLonelyEdgeCount)
+            return false;
+
+        for (const auto& leftEdge: lhs)
+        {
+            if ((leftEdge != LONELY_EDGE) && (leftEdge != UNKNOWN_EDGE))
+            {
+                if (std::find(rhs.cbegin(), rhs.cend(), leftEdge) == rhs.cend())
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    static bool DoEdgeListsMatch2(const BigIntList& lhs, const BigIntList& rhs, BigInt& rotated, bool& flipped)
+    {
+        assert(lhs.size() == NUM_EDGES);
+        assert(rhs.size() == NUM_EDGES);
+
+        flipped = false;
+        for (rotated = 0; rotated < NUM_EDGES; ++rotated)
+        {
+            if (DoEdgesMatch(lhs, rhs, rotated, flipped))
+                return true;
+        }
+
+        flipped = true;
+        for (rotated = 0; rotated < NUM_EDGES; ++rotated)
+        {
+            if (DoEdgesMatch(lhs, rhs, rotated, flipped))
+                return true;
+        }
+
+        return false;
+    }
+
+    static bool DoEdgesMatch(const BigIntList& lhs, const BigIntList& rhs, BigInt rotated, bool flipped)
+    {
+        for (BigInt edge = TOP_EDGE; edge < NUM_EDGES; ++edge)
+        {
+            const BigInt leftEdge = lhs[edge];
+            const BigInt transformedRightEdge = TransformPlacedEdgeToSourceEdge(edge, rotated, flipped);
+            const BigInt rightEdge = rhs[transformedRightEdge];
+
+            if ((leftEdge != UNKNOWN_EDGE) && (rightEdge != UNKNOWN_EDGE) && (leftEdge != rightEdge))
+                return false;
+        }
+
+        return true;
+    }
+
+    BigInt GetAlreadyPlacedTileEdge(BigInt tileIndex, BigInt rotation, bool flipped, BigInt placedEdge) const
+    {
+        const Tile& tile = m_tileList[tileIndex];
+        const BigInt originalEdgeDir = TransformPlacedEdgeToSourceEdge(placedEdge, rotation, flipped);
+        return tile.edgeList[originalEdgeDir];
+    }
+
+    static BigInt TransformSourceEdgeToPlacedEdge(BigInt edge, BigInt rotation, bool flipped)
+    {
+        return flipped ? ((NUM_EDGES - edge + rotation) % NUM_EDGES) : ((edge + rotation) % NUM_EDGES);
+    }
+
+    static BigInt TransformPlacedEdgeToSourceEdge(BigInt edge, BigInt rotation, bool flipped)
+    {
+        return flipped ? ((NUM_EDGES - edge + rotation) % NUM_EDGES) : ((NUM_EDGES + edge - rotation) % NUM_EDGES);
+    }
+
+    char GetCharInPlacedTile(BigInt tileIndex, BigInt rotated, bool flipped, BigInt x, BigInt y) const
+    {
+        const Tile& tile = m_tileList[tileIndex];
+        const BigInt tileEdgeSize = tile.data.size();
+
+        BigInt sourceX = x;
+        BigInt sourceY = y;
+        TransformPlacedTileCoordToSourceCoord(tileEdgeSize, rotated, flipped, sourceX, sourceY);
+
+        return tile.data[sourceY][sourceX];
+    }
+
+    static void TransformPlacedTileCoordToSourceCoord(BigInt tileEdgeSize, BigInt rotated, bool flipped, BigInt& x, BigInt& y)
+    {
+        BigInt newX, newY;
+        switch (rotated)
+        {
+            case 0:
+                newX = x;
+                newY = y;
+                break;
+            case 1:
+                newX = y;
+                newY = tileEdgeSize - 1 - x;
+                break;
+            case 2:
+                newX = tileEdgeSize - 1 - x;
+                newY = tileEdgeSize - 1 - y;
+                break;
+            case 3:
+                newX = tileEdgeSize - 1 - y;
+                newY = x;
+                break;
+        }
+        x = newX;
+        y = newY;
     }
 
     typedef std::unordered_map<std::string, BigInt> EdgeMap;
-    typedef std::vector<BigIntList> EdgeTileList;
+    typedef BigIntListList EdgeTileList;
     EdgeMap m_edgeMap;
     EdgeTileList m_edgeTileList;
+
+    StringList m_image;
 };
 
 void RunJurassicJigsaw()
 {
     JurassicJigsaw testData("Day20TestInput.txt");
     printf("Test data corner tile id product = %lld\n", testData.CalcCornerTileIdProduct());
+    testData.AssembleImage2(true);
 
     JurassicJigsaw mainData("Day20Input.txt");
     printf("Main data corner tile id product = %lld\n", mainData.CalcCornerTileIdProduct());
