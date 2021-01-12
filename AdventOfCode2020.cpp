@@ -4352,20 +4352,11 @@ public:
                     edgeListToCheck[BOTTOM_EDGE] = LONELY_EDGE;
 
                 BigInt foundTileIndex = -1;
-                BigInt startIndex = 0;
                 BigInt rotated = 0;
                 bool flipped = false;
-                for (;;)
-                {
-                    const bool foundTile = FindTileWithEdges(edgeListToCheck, foundTileIndex, rotated, flipped, startIndex);
-                    assert(foundTile);
-                    assert(foundTileIndex >= 0);
-
-                    if (!tilesUsed[foundTileIndex])
-                        break;
-
-                    startIndex = foundTileIndex + 1;
-                }
+                const bool foundTile = FindTileWithEdges(tilesUsed, edgeListToCheck, foundTileIndex, rotated, flipped);
+                assert(foundTile);
+                assert(foundTileIndex >= 0);
 
                 tilesUsed[foundTileIndex] = true;
                 imageTileIndices[imageTileIndexIndex] = foundTileIndex;
@@ -4502,11 +4493,19 @@ private:
     static const BigInt UNKNOWN_EDGE = -2;
 
     bool FindTileWithEdges(
-        const BigIntList& edgeList, BigInt& tileIndex, BigInt& rotated, bool& flipped, BigInt startIndex = 0) const
+        const BoolList& tilesUsed,
+        const BigIntList& edgeList,
+        BigInt& tileIndex,
+        BigInt& rotated,
+        bool& flipped,
+        BigInt startIndex = 0) const
     {
         static BigIntList thisTileEdgeList(4, UNKNOWN_EDGE);
-        for (tileIndex = startIndex; tileIndex < (BigInt)m_tileList.size(); ++tileIndex)
+        for (tileIndex = 0; tileIndex < (BigInt)m_tileList.size(); ++tileIndex)
         {
+            if (tilesUsed[tileIndex])
+                continue;
+
             const Tile& tile = m_tileList[tileIndex];
 
             for (BigInt edge = TOP_EDGE; edge < NUM_EDGES; ++edge)
