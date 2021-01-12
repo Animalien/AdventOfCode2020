@@ -184,7 +184,9 @@ static FactorizationCache s_factorizationCache;
 // Strings
 
 typedef std::vector<std::string> StringList;
+typedef std::vector<StringList> StringListList;
 typedef std::set<std::string> StringSet;
+typedef std::map<std::string, std::string> StringMap;
 typedef std::unordered_set<std::string> UnorderedStringSet;
 
 static const char* fileNameBase = "..\\Input\\";
@@ -4828,6 +4830,203 @@ void RunJurassicJigsaw()
 }
 
 
+
+////////////////////////////
+// Problem 21 - Allergen Assessment
+
+class AllergenLab
+{
+public:
+    AllergenLab(const char* fileName, bool verbose)
+    {
+        ReadFileLines(fileName, m_data);
+
+        for (const auto& line: m_data)
+        {
+            m_foodList.push_back(Food());
+            Food& food = m_foodList.back();
+
+            StringList tokens;
+            Tokenize(line, tokens, ' ');
+            const BigInt numTokens = tokens.size();
+
+            if (verbose)
+                printf("Food:\n  Ingredients: ");
+
+            BigInt tokenIndex = 0;
+            while ((tokenIndex < numTokens) && (tokens[tokenIndex][0] != '('))
+            {
+                const std::string& ingredient = tokens[tokenIndex];
+                food.ingredients.insert(ingredient);
+                ++tokenIndex;
+
+                m_ingredientSet.insert(ingredient);
+
+                if (verbose)
+                    printf("%s ", ingredient.c_str());
+            }
+            if (verbose)
+                printf("\n  Allergens: ");
+
+            if ((tokenIndex < numTokens) && (tokens[tokenIndex][0] == '('))
+            {
+                assert(tokens[tokenIndex] == "(contains");
+                ++tokenIndex;
+
+                while (tokenIndex < numTokens)
+                {
+                    const std::string allergen = tokens[tokenIndex].substr(0, tokens[tokenIndex].length() - 1);
+                    food.allergens.insert(allergen);
+                    ++tokenIndex;
+
+                    StringSet& allergenIngredientSet =
+                        m_allergenToIngredientsWorkingMap
+                            .insert(AllergenToIngredientsWorkingMap::value_type(allergen, StringSet()))
+                            .first->second;
+                    if (allergenIngredientSet.empty())
+                        allergenIngredientSet = food.ingredients;
+                    else
+                        IntersectSet(allergenIngredientSet, food.ingredients);
+
+                    if (verbose)
+                        printf("%s ", allergen.c_str());
+                }
+                if (verbose)
+                    printf("\n");
+            }
+        }
+
+        if (verbose)
+        {
+            printf("\nIngredients:\n");
+            for (const auto& ingredient: m_ingredientSet)
+            {
+                printf("  %s\n", ingredient.c_str());
+            }
+
+            printf("Allergens:\n");
+            for (const auto& allergenMapNode: m_allergenToIngredientsWorkingMap)
+            {
+                const auto& allergen = allergenMapNode.first;
+                printf("  %s\n    ingredients with allergen: ", allergen.c_str());
+                for (const auto& ingredient: allergenMapNode.second)
+                {
+                    printf("%s ", ingredient.c_str());
+                }
+                printf("\n");
+            }
+        }
+
+        m_nonAllergenIngredientSet = m_ingredientSet;
+
+        ReduceAllergenIngredients();
+
+        if (verbose)
+        {
+            printf("\nNon-allergen ingredients:\n");
+            for (const auto& ingredient: m_nonAllergenIngredientSet)
+            {
+                printf("  %s\n", ingredient.c_str());
+            }
+
+            printf("\nAllergen-ingredient pairings:\n");
+            for (const auto& pairing: m_allergenToIngredientsMap)
+            {
+                printf("  %s - %s\n", pairing.first.c_str(), pairing.second.c_str());
+            }
+        }
+    }
+
+    BigInt CountHowManyTimesNonAlergenIngredientsAppearInFood() const
+    {
+        BigInt count = 0;
+        for (const auto& ingredient: m_nonAllergenIngredientSet)
+        {
+            for (const auto& food: m_foodList)
+            {
+                count += food.ingredients.count(ingredient);
+            }
+        }
+        return count;
+    }
+
+private:
+    struct Food
+    {
+        StringSet ingredients;
+        StringSet allergens;
+
+        Food() : ingredients(), allergens() {}
+    };
+
+    typedef std::vector<Food> FoodList;
+
+    typedef std::map<std::string, StringSet> AllergenToIngredientsWorkingMap;
+    typedef StringMap AllergenToIngredientsMap;
+
+    void ReduceAllergenIngredients()
+    {
+        bool foundSomethingToReduce = false;
+        do
+        {
+            foundSomethingToReduce = false;
+            std::string ingredientToRemove;
+
+            for (const auto& allergenMapNode: m_allergenToIngredientsWorkingMap)
+            {
+                if (allergenMapNode.second.size() == 1)
+                {
+                    const auto& ingredient = *allergenMapNode.second.begin();
+
+                    // ingredient has an allergen, so remove it from the non-allergen ingredients
+
+                    m_nonAllergenIngredientSet.erase(ingredient);
+
+                    // add this allergen-ingredient assocation to the final map
+
+                    m_allergenToIngredientsMap.insert(AllergenToIngredientsMap::value_type(allergenMapNode.first, ingredient));
+
+                    // remove all other instances of ingredient
+
+                    foundSomethingToReduce = true;
+                    ingredientToRemove = ingredient;
+                    break;
+                }
+            }
+
+            if (foundSomethingToReduce)
+            {
+                assert(!ingredientToRemove.empty());
+
+                for (auto& allergenMapNode: m_allergenToIngredientsWorkingMap)
+                    allergenMapNode.second.erase(ingredientToRemove);
+            }
+        } while (foundSomethingToReduce);
+    }
+
+    StringList m_data;
+    FoodList m_foodList;
+    StringSet m_ingredientSet;
+    StringSet m_nonAllergenIngredientSet;
+    AllergenToIngredientsWorkingMap m_allergenToIngredientsWorkingMap;
+    AllergenToIngredientsMap m_allergenToIngredientsMap;
+};
+
+void RunAllergenAssessment()
+{
+    AllergenLab testData("Day21TestInput.txt", true);
+    printf(
+        "In test data, number of times non-allergen ingredients appear in food = %lld\n",
+        testData.CountHowManyTimesNonAlergenIngredientsAppearInFood());
+
+    AllergenLab mainData("Day21Input.txt", false);
+    printf(
+        "In main data, number of times non-allergen ingredients appear in food = %lld\n",
+        mainData.CountHowManyTimesNonAlergenIngredientsAppearInFood());
+}
+
+
+
 ////////////////////////////
 ////////////////////////////
 // Main
@@ -4906,6 +5105,9 @@ int main(int argc, char** argv)
             break;
         case 20:
             RunJurassicJigsaw();
+            break;
+        case 21:
+            RunAllergenAssessment();
             break;
         default:
             printf("'%s' is not a valid problem number!\n\n", problemArg);
