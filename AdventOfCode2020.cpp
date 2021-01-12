@@ -4473,6 +4473,8 @@ public:
 
         if (verbose)
         {
+            const bool extra = false;
+
             printf("\n\nImage:\n\n");
 
             const BigInt tileEdgeSize = m_tileList[0].data.size();
@@ -4490,9 +4492,16 @@ public:
 
                         for (BigInt x = 0; x < tileEdgeSize; ++x)
                         {
-                            printf("%c", GetCharInPlacedTile(tileIndex, rotated, flipped, x, y));
+                            if (extra)
+                                printf(
+                                    "%lld%c%c ",
+                                    rotated,
+                                    GetCharInPlacedTile(tileIndex, rotated, flipped, x, y),
+                                    flipped ? 'f' : '-');
+                            else
+                                printf("%c", GetCharInPlacedTile(tileIndex, rotated, flipped, x, y));
                         }
-                        printf(" ");
+                        printf(extra ? "  " : " ");
                     }
                     printf("\n");
                 }
@@ -4712,19 +4721,19 @@ private:
         const Tile& tile = m_tileList[tileIndex];
         const BigInt tileEdgeSize = tile.data.size();
 
-        BigInt sourceX = x;
-        BigInt sourceY = y;
-        TransformPlacedTileCoordToSourceCoord(tileEdgeSize, rotated, flipped, sourceX, sourceY);
+        TransformPlacedTileCoordToSourceCoord(tileEdgeSize, rotated, flipped, x, y);
 
-        return tile.data[sourceY][sourceX];
+        return tile.data[y][x];
     }
 
     static void TransformPlacedTileCoordToSourceCoord(BigInt tileEdgeSize, BigInt rotated, bool flipped, BigInt& x, BigInt& y)
     {
-        BigInt newX, newY;
+        BigInt newX = 0;
+        BigInt newY = 0;
         switch (rotated)
         {
             case 0:
+            default:
                 newX = x;
                 newY = y;
                 break;
@@ -4741,7 +4750,7 @@ private:
                 newY = x;
                 break;
         }
-        x = newX;
+        x = flipped ? (tileEdgeSize - 1 - newX) : newX;
         y = newY;
     }
 
