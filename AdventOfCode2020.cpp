@@ -4365,42 +4365,64 @@ public:
             }
         }
 
+        const bool extraVerbose = false;
+
+        if (verbose)
+            printf("\n\nImage tiles arranged (before trimming and finalizing):\n\n");
+
+        const BigInt tileEdgeSize = m_tileList[0].data.size();
+        const BigInt imageEdgeSize = numTilesPerSide * (tileEdgeSize - 2);
+        const BigInt imageSize = imageEdgeSize * imageEdgeSize;
+        m_image.reserve(imageSize);
+        for (BigInt tileY = 0; tileY < numTilesPerSide; ++tileY)
+        {
+            for (BigInt y = 0; y < tileEdgeSize; ++y)
+            {
+                for (BigInt tileX = 0; tileX < numTilesPerSide; ++tileX)
+                {
+                    const BigInt tileIndexIndex = tileY * numTilesPerSide + tileX;
+                    const BigInt tileIndex = imageTileIndices[tileIndexIndex];
+                    const BigInt rotated = tileRotations[tileIndexIndex];
+                    const bool flipped = tilesFlipped[tileIndexIndex];
+
+                    for (BigInt x = 0; x < tileEdgeSize; ++x)
+                    {
+                        const char charInTile = GetCharInPlacedTile(tileIndex, rotated, flipped, x, y);
+
+                        if ((x > 0) && (x < (tileEdgeSize - 1)) && (y > 0) && (y < (tileEdgeSize - 1)))
+                            m_image.push_back(charInTile);
+
+                        if (verbose)
+                        {
+                            if (extraVerbose)
+                                printf("%lld%c%c ", rotated, charInTile, flipped ? 'f' : '-');
+                            else
+                                printf("%c", charInTile);
+                        }
+                    }
+                    if (verbose)
+                        printf(extraVerbose ? "  " : " ");
+                }
+                if (verbose)
+                    printf("\n");
+            }
+            if (verbose)
+                printf("\n\n");
+        }
+
         if (verbose)
         {
-            const bool extra = false;
+            printf("\n\nComplete assembled image:\n\n");
 
-            printf("\n\nImage:\n\n");
-
-            const BigInt tileEdgeSize = m_tileList[0].data.size();
-
-            for (BigInt tileY = 0; tileY < numTilesPerSide; ++tileY)
+            for (BigInt y = 0; y < imageEdgeSize; ++y)
             {
-                for (BigInt y = 0; y < tileEdgeSize; ++y)
+                for (BigInt x = 0; x < imageEdgeSize; ++x)
                 {
-                    for (BigInt tileX = 0; tileX < numTilesPerSide; ++tileX)
-                    {
-                        const BigInt tileIndexIndex = tileY * numTilesPerSide + tileX;
-                        const BigInt tileIndex = imageTileIndices[tileIndexIndex];
-                        const BigInt rotated = tileRotations[tileIndexIndex];
-                        const bool flipped = tilesFlipped[tileIndexIndex];
-
-                        for (BigInt x = 0; x < tileEdgeSize; ++x)
-                        {
-                            if (extra)
-                                printf(
-                                    "%lld%c%c ",
-                                    rotated,
-                                    GetCharInPlacedTile(tileIndex, rotated, flipped, x, y),
-                                    flipped ? 'f' : '-');
-                            else
-                                printf("%c", GetCharInPlacedTile(tileIndex, rotated, flipped, x, y));
-                        }
-                        printf(extra ? "  " : " ");
-                    }
-                    printf("\n");
+                    printf("%c", m_image[y * imageEdgeSize + x]);
                 }
-                printf("\n\n");
+                printf("\n");
             }
+            printf("\n\n");
         }
     }
 
@@ -4620,7 +4642,7 @@ private:
     EdgeMap m_edgeMap;
     EdgeTileList m_edgeTileList;
 
-    StringList m_image;
+    std::string m_image;
 };
 
 void RunJurassicJigsaw()
