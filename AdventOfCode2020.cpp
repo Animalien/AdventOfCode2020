@@ -4950,6 +4950,22 @@ public:
         return count;
     }
 
+    std::string DetermineCanonicalDangerousIngredientList() const
+    {
+        std::string list;
+        for (const auto& mapNode: m_allergenToIngredientsMap)
+        {
+            if (list.empty())
+                list = mapNode.second;
+            else
+            {
+                list += ",";
+                list += mapNode.second;
+            }
+        }
+        return list;
+    }
+
 private:
     struct Food
     {
@@ -5018,11 +5034,13 @@ void RunAllergenAssessment()
     printf(
         "In test data, number of times non-allergen ingredients appear in food = %lld\n",
         testData.CountHowManyTimesNonAlergenIngredientsAppearInFood());
+    printf("Test data canonical dangerous ingredient list: %s\n", testData.DetermineCanonicalDangerousIngredientList().c_str());
 
     AllergenLab mainData("Day21Input.txt", false);
     printf(
         "In main data, number of times non-allergen ingredients appear in food = %lld\n",
         mainData.CountHowManyTimesNonAlergenIngredientsAppearInFood());
+    printf("Main data canonical dangerous ingredient list: %s\n", mainData.DetermineCanonicalDangerousIngredientList().c_str());
 }
 
 
