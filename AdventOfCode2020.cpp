@@ -5053,7 +5053,7 @@ void RunAllergenAssessment()
 class CrabCombat
 {
 public:
-    CrabCombat(const char* fileName)
+    CrabCombat(const char* fileName) : m_nextGameNumber(1), m_thisGameNumber(0)
     {
         StringList fileLines;
         ReadFileLines(fileName, fileLines);
@@ -5079,9 +5079,21 @@ public:
             m_player2Deck.push_back(atoll(fileLines[lineIndex].c_str()));
             ++lineIndex;
         }
+
+        m_origPlayer1Deck = m_player1Deck;
+        m_origPlayer2Deck = m_player2Deck;
     }
 
-    void PlayGame(bool verbose)
+    void Reset()
+    {
+        m_nextGameNumber = 1;
+        m_thisGameNumber = 0;
+        m_player1Deck = m_origPlayer1Deck;
+        m_player2Deck = m_origPlayer2Deck;
+        m_roundDecksList.clear();
+    }
+
+    void PlayGame(BigInt& winningScore, bool verbose)
     {
         BigInt round = 1;
         if (verbose)
@@ -5149,6 +5161,146 @@ public:
                 printf("Player 1 wins the game!\n\n");
             }
         }
+
+        winningScore = CalcWinningPlayerScore();
+    }
+
+    void PlayRecursiveGame(BigInt* pWinningPlayer, BigInt* pWinningScore, bool verbose)
+    {
+        m_thisGameNumber = m_nextGameNumber++;
+        m_roundDecksList.clear();
+
+        BigInt round = 1;
+        if (verbose)
+            printf("=== Game %lld ===\n\n", m_thisGameNumber);
+
+        while (!m_player1Deck.empty() && !m_player2Deck.empty())
+        {
+            if (IsThisRoundARepeater())
+            {
+                if (pWinningPlayer)
+                    *pWinningPlayer = 1;
+                if (pWinningScore)
+                    *pWinningScore = 0;
+
+                if (verbose)
+                    printf(
+                        "-- Round %lld (Game %lld) --\nRound is a repeater, so Player 1 wins the game!\n\n",
+                        round,
+                        m_thisGameNumber);
+
+                return;
+            }
+
+            m_roundDecksList.push_back(RoundDecks(m_player1Deck, m_player2Deck));
+
+            const BigInt player1Plays = m_player1Deck.front();
+            const BigInt player2Plays = m_player2Deck.front();
+
+            if (verbose)
+            {
+                printf("-- Round %lld (Game %lld) --\n", round, m_thisGameNumber);
+                printf("Player 1's deck: ");
+                for (const BigInt card: m_player1Deck)
+                    printf("%lld ", card);
+                printf("\nPlayer 2's deck: ");
+                for (const BigInt card: m_player2Deck)
+                    printf("%lld ", card);
+                printf("\nPlayer 1 plays: %lld\n", player1Plays);
+                printf("Player 2 plays: %lld\n", player2Plays);
+            }
+
+            m_player1Deck.pop_front();
+            m_player2Deck.pop_front();
+
+            if (((BigInt)m_player1Deck.size() >= player1Plays) && ((BigInt)m_player2Deck.size() >= player2Plays))
+            {
+                m_pausedGameStack.push_back(PausedGame(m_thisGameNumber, m_player1Deck, m_player2Deck, m_roundDecksList));
+
+                if (verbose)
+                    printf("Playing a sub-game to determine the winner...\n\n");
+
+                m_player1Deck.resize(player1Plays);
+                m_player2Deck.resize(player2Plays);
+
+                BigInt winningPlayer = 0;
+                PlayRecursiveGame(&winningPlayer, nullptr, verbose);
+
+                const PausedGame& pausedGame = m_pausedGameStack.back();
+                m_thisGameNumber = pausedGame.gameNumber;
+                m_player1Deck = pausedGame.player1Deck;
+                m_player2Deck = pausedGame.player2Deck;
+                m_roundDecksList = pausedGame.roundDecksList;
+                m_pausedGameStack.pop_back();
+
+                if (verbose)
+                    printf("...anyway, back to game %lld.\n", m_thisGameNumber);
+
+                if (winningPlayer == 1)
+                {
+                    m_player1Deck.push_back(player1Plays);
+                    m_player1Deck.push_back(player2Plays);
+
+                    if (verbose)
+                        printf("Player 1 wins round %lld of game %lld!\n\n", round, m_thisGameNumber);
+                }
+                else
+                {
+                    m_player2Deck.push_back(player2Plays);
+                    m_player2Deck.push_back(player1Plays);
+
+                    if (verbose)
+                        printf("Player 2 wins round %lld of game %lld!\n\n", round, m_thisGameNumber);
+                }
+            }
+            else if (player1Plays > player2Plays)
+            {
+                m_player1Deck.push_back(player1Plays);
+                m_player1Deck.push_back(player2Plays);
+
+                if (verbose)
+                    printf("Player 1 wins round %lld of game %lld!\n\n", round, m_thisGameNumber);
+            }
+            else
+            {
+                assert(player2Plays > player1Plays);
+
+                m_player2Deck.push_back(player2Plays);
+                m_player2Deck.push_back(player1Plays);
+
+                if (verbose)
+                    printf("Player 2 wins round %lld of game %lld!\n\n", round, m_thisGameNumber);
+            }
+
+            ++round;
+        }
+
+        if (verbose)
+        {
+            printf("== Post-game results ==\n");
+
+            printf("Player 1's deck: ");
+            for (const BigInt card: m_player1Deck)
+                printf("%lld ", card);
+            printf("\nPlayer 2's deck: ");
+            for (const BigInt card: m_player2Deck)
+                printf("%lld ", card);
+            printf("\n\n");
+
+            if (m_player1Deck.empty())
+                printf("Player 2 wins the game!\n\n");
+            else
+            {
+                assert(m_player2Deck.empty());
+                printf("Player 1 wins the game!\n\n");
+            }
+        }
+
+        if (pWinningPlayer)
+            *pWinningPlayer = m_player2Deck.empty() ? 1 : 2;
+
+        if (pWinningScore)
+            *pWinningScore = CalcWinningScore(m_player2Deck.empty() ? m_player1Deck : m_player2Deck);
     }
 
     BigInt CalcWinningPlayerScore() const
@@ -5156,7 +5308,51 @@ public:
         assert(m_player1Deck.empty() || m_player2Deck.empty());
 
         const BigIntDeque& winningPlayerDeck = m_player2Deck.empty() ? m_player1Deck : m_player2Deck;
+        return CalcWinningScore(winningPlayerDeck);
+    }
 
+private:
+    struct RoundDecks
+    {
+        BigIntDeque player1Deck;
+        BigIntDeque player2Deck;
+
+        RoundDecks(const BigIntDeque& p1D, const BigIntDeque& p2D) : player1Deck(p1D), player2Deck(p2D) {}
+    };
+
+    typedef std::vector<RoundDecks> RoundDecksList;
+
+    struct PausedGame
+    {
+        BigInt gameNumber;
+        BigIntDeque player1Deck;
+        BigIntDeque player2Deck;
+        RoundDecksList roundDecksList;
+
+        PausedGame(BigInt gn, const BigIntDeque& p1D, const BigIntDeque& p2D, const RoundDecksList& rdl)
+            : gameNumber(gn), player1Deck(p1D), player2Deck(p2D), roundDecksList(rdl)
+        {
+        }
+    };
+
+    typedef std::vector<PausedGame> PausedGameStack;
+
+    bool IsThisRoundARepeater() const
+    {
+        if (m_roundDecksList.empty())
+            return false;
+
+        for (const auto& prevRound: m_roundDecksList)
+        {
+            if ((m_player1Deck != prevRound.player1Deck) || (m_player2Deck != prevRound.player2Deck))
+                return false;
+        }
+
+        return true;
+    }
+
+    static BigInt CalcWinningScore(const BigIntDeque& winningPlayerDeck)
+    {
         BigInt score = 0;
         BigInt index = (BigInt)winningPlayerDeck.size();
 
@@ -5171,20 +5367,36 @@ public:
         return score;
     }
 
-private:
+    BigInt m_nextGameNumber;
+
+    BigInt m_thisGameNumber;
     BigIntDeque m_player1Deck;
     BigIntDeque m_player2Deck;
+    RoundDecksList m_roundDecksList;
+
+    PausedGameStack m_pausedGameStack;
+
+    BigIntDeque m_origPlayer1Deck;
+    BigIntDeque m_origPlayer2Deck;
 };
 
 void RunCrabCombat()
 {
+    BigInt winningScore = 0;
+
     CrabCombat testData("Day22TestInput.txt");
-    testData.PlayGame(true);
-    printf("Test data, winning player score = %lld\n", testData.CalcWinningPlayerScore());
+    testData.PlayGame(winningScore, true);
+    printf("Test data, winning player score = %lld\n", winningScore);
+    testData.Reset();
+    testData.PlayRecursiveGame(nullptr, &winningScore, true);
+    printf("Test data, winning player score for recursive game = %lld\n", winningScore);
 
     CrabCombat mainData("Day22Input.txt");
-    mainData.PlayGame(false);
-    printf("Main data, winning player score = %lld\n", mainData.CalcWinningPlayerScore());
+    mainData.PlayGame(winningScore, false);
+    printf("Main data, winning player score = %lld\n", winningScore);
+    mainData.Reset();
+    mainData.PlayRecursiveGame(nullptr, &winningScore, false);
+    printf("Main data, winning player score for recursive game = %lld\n", winningScore);
 }
 
 
