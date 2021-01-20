@@ -367,6 +367,159 @@ void IntersectSet(std::set<T>& lhs, const std::set<T>& rhs)
 
 
 ////////////////////////////
+// Circular Buffer
+
+template<typename T, BigInt NUM_CAPACITY_BITS>
+class CircularBuffer
+{
+public:
+    CircularBuffer() : m_buffer(), m_numInBuffer(0), m_readIndex(0), m_writeIndex(0) {}
+    CircularBuffer(const CircularBuffer& other) : m_buffer(), m_numInBuffer(0), m_readIndex(0), m_writeIndex(0) { *this = other; }
+
+    BigInt GetCapacity() const { return CAPACITY; }
+    BigInt GetSize() const { return m_numInBuffer; }
+    bool IsEmpty() const { return m_numInBuffer == 0; }
+
+    void Clear() { m_numInBuffer = m_readIndex = m_writeIndex = 0; }
+
+    CircularBuffer& operator=(const CircularBuffer& rhs)
+    {
+        Clear();
+        for (const T& item: rhs)
+            Write(item);
+        return *this;
+    }
+
+    const T& PeekRead() const
+    {
+        assert(!IsEmpty());
+        return m_buffer[m_readIndex];
+    }
+    T Read()
+    {
+        const T retVal = PeekRead();
+        PopRead();
+        return retVal;
+    }
+    void PopRead()
+    {
+        assert(!IsEmpty());
+        m_readIndex = IncrementIndex(m_readIndex);
+        --m_numInBuffer;
+    }
+    void PopWrite()
+    {
+        assert(!IsEmpty());
+        m_writeIndex = DecrementIndex(m_writeIndex);
+        --m_numInBuffer;
+    }
+
+    void Write(const T& newValue)
+    {
+        m_buffer[m_writeIndex] = newValue;
+        m_writeIndex = IncrementIndex(m_writeIndex);
+        ++m_numInBuffer;
+    }
+
+    struct ConstIterator
+    {
+        const CircularBuffer& buffer;
+        BigInt index;
+
+        ConstIterator(const CircularBuffer& b, BigInt i) : buffer(b), index(i) {}
+        ConstIterator(const ConstIterator& other) : buffer(other.buffer), index(other.index) {}
+
+        bool operator==(const ConstIterator& rhs) const { return ((&buffer == &rhs.buffer) && (index == rhs.index)); }
+        bool operator!=(const ConstIterator& rhs) const { return ((&buffer != &rhs.buffer) || (index != rhs.index)); }
+
+        const T& operator*() const { return buffer.m_buffer[index]; }
+
+        void operator++() { index = StepIndex(index, +1); }
+    };
+    struct Iterator
+    {
+        CircularBuffer& buffer;
+        BigInt index;
+
+        Iterator(CircularBuffer& b, BigInt i) : buffer(b), index(i) {}
+        Iterator(const Iterator& other) : buffer(other.buffer), index(other.index) {}
+
+        bool operator==(const Iterator& rhs) const { return ((&buffer == &rhs.buffer) && (index == rhs.index)); }
+        bool operator!=(const Iterator& rhs) const { return ((&buffer != &rhs.buffer) || (index != rhs.index)); }
+
+        T& operator*() const { return buffer.m_buffer[index]; }
+
+        void operator++() { index = StepIndex(index, +1); }
+    };
+
+    bool operator==(const CircularBuffer& rhs) const
+    {
+        if (GetSize() != rhs.GetSize())
+            return false;
+        ConstIterator iter = cbegin();
+        const ConstIterator iterEnd = cend();
+        ConstIterator rhsIter = rhs.cbegin();
+        for (; iter != iterEnd; ++iter, ++rhsIter)
+        {
+            if (*iter != *rhsIter)
+                return false;
+        }
+
+        return true;
+    }
+    bool operator!=(const CircularBuffer& rhs) const { return !(*this == rhs); }
+
+    // STL
+
+    bool empty() const { return IsEmpty(); }
+    size_t size() const { return GetSize(); }
+    void resize(size_t newSize)
+    {
+        const BigInt sizeDiff = (BigInt)newSize - GetSize();
+        if (sizeDiff > 0)
+        {
+            while (sizeDiff > 0)
+            {
+                Write(T());
+                --sizeDiff;
+            }
+        }
+        else
+        {
+            while (sizeDiff < 0)
+            {
+                PopWrite();
+                ++sizeDiff;
+            }
+        }
+    }
+    const T& front() const { return PeekRead(); }
+    void pop_front() { PopRead(); }
+    void push_back(const T& newValue) { Write(newValue); }
+    ConstIterator cbegin() const { return ConstIterator(*this, m_readIndex); }
+    ConstIterator cend() const { return ConstIterator(*this, m_writeIndex); }
+    ConstIterator begin() const { return ConstIterator(*this, m_readIndex); }
+    ConstIterator end() const { return ConstIterator(*this, m_writeIndex); }
+    Iterator begin() { return Iterator(*this, m_readIndex); }
+    Iterator end() { return Iterator(*this, m_writeIndex); }
+
+private:
+    static const BigInt CAPACITY = 1LL << NUM_CAPACITY_BITS;
+    static const BigInt CAPACITY_MASK = CAPACITY - 1;
+
+    static BigInt IncrementIndex(BigInt index) { return StepIndex(index, +1); }
+    static BigInt DecrementIndex(BigInt index) { return StepIndex(index, -1); }
+    static BigInt StepIndex(BigInt index, BigInt step) { return (index + step + CAPACITY) & CAPACITY_MASK; }
+
+    T m_buffer[CAPACITY];
+    BigInt m_numInBuffer;
+    BigInt m_readIndex;
+    BigInt m_writeIndex;
+};
+
+
+
+////////////////////////////
 ////////////////////////////
 // Problems
 
@@ -5242,16 +5395,13 @@ public:
                 if (verbose)
                     printf("Playing a sub-game to determine the winner...\n\n");
 
-                m_player1Deck.resize(player1Plays);
-                m_player2Deck.resize(player2Plays);
-
                 BigInt winningPlayer = 0;
                 PlayRecursiveGame(&winningPlayer, nullptr, verbose);
 
                 PausedGame& pausedGame = m_pausedGameStack.back();
                 m_thisGameNumber = pausedGame.gameNumber;
-                m_player1Deck.swap(pausedGame.player1Deck);
-                m_player2Deck.swap(pausedGame.player2Deck);
+                m_player1Deck = pausedGame.player1Deck;
+                m_player2Deck = pausedGame.player2Deck;
                 m_roundDecksSet.swap(pausedGame.roundDecksSet);
                 m_pausedGameStack.pop_back();
 
@@ -5330,21 +5480,23 @@ public:
     {
         assert(m_player1Deck.empty() || m_player2Deck.empty());
 
-        const BigIntDeque& winningPlayerDeck = m_player2Deck.empty() ? m_player1Deck : m_player2Deck;
+        const CrabDeck& winningPlayerDeck = m_player2Deck.empty() ? m_player1Deck : m_player2Deck;
         return CalcWinningScore(winningPlayerDeck);
     }
 
 private:
+    typedef CircularBuffer<BigInt, 6> CrabDeck;
+
     typedef UnorderedStringSet RoundDecksSet;
 
     struct PausedGame
     {
         BigInt gameNumber;
-        BigIntDeque player1Deck;
-        BigIntDeque player2Deck;
+        CrabDeck player1Deck;
+        CrabDeck player2Deck;
         RoundDecksSet roundDecksSet;
 
-        PausedGame(BigInt gn, const BigIntDeque& p1D, const BigIntDeque& p2D, const RoundDecksSet& rds)
+        PausedGame(BigInt gn, const CrabDeck& p1D, const CrabDeck& p2D, const RoundDecksSet& rds)
             : gameNumber(gn), player1Deck(p1D), player2Deck(p2D), roundDecksSet(rds)
         {
         }
@@ -5352,7 +5504,7 @@ private:
 
     typedef std::vector<PausedGame> PausedGameStack;
 
-    static void AssembleDeckString(const BigIntDeque& deck1, const BigIntDeque& deck2, std::string& st)
+    static void AssembleDeckString(const CrabDeck& deck1, const CrabDeck& deck2, std::string& st)
     {
         const BigInt BASE_CHAR = 32;
 
@@ -5368,7 +5520,7 @@ private:
         }
     }
 
-    static BigInt CalcWinningScore(const BigIntDeque& winningPlayerDeck)
+    static BigInt CalcWinningScore(const CrabDeck& winningPlayerDeck)
     {
         BigInt score = 0;
         BigInt index = (BigInt)winningPlayerDeck.size();
@@ -5389,14 +5541,14 @@ private:
     BigInt m_nextGameNumber;
 
     BigInt m_thisGameNumber;
-    BigIntDeque m_player1Deck;
-    BigIntDeque m_player2Deck;
+    CrabDeck m_player1Deck;
+    CrabDeck m_player2Deck;
     RoundDecksSet m_roundDecksSet;
 
     PausedGameStack m_pausedGameStack;
 
-    BigIntDeque m_origPlayer1Deck;
-    BigIntDeque m_origPlayer2Deck;
+    CrabDeck m_origPlayer1Deck;
+    CrabDeck m_origPlayer2Deck;
 
     MemoizedWinnerMap m_memoizedWinnerMap;
 };
