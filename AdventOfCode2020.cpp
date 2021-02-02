@@ -5549,14 +5549,14 @@ private:
     typedef std::vector<PausedGame> PausedGameStack;
 
     static void CreateGameSnapshot(
-        const CrabDeck& deck1, const CrabDeck& deck2, std::string& st, BigInt numFromDeck1 = -1, BigInt numFromDeck2 = -1)
+        const CrabDeck& deck1, const CrabDeck& deck2, GameSnapshot& snapshot, BigInt numFromDeck1 = -1, BigInt numFromDeck2 = -1)
     {
         const BigInt BASE_CHAR = 32;
 
-        st.clear();
+        snapshot.clear();
         for (const BigInt card: deck1)
         {
-            st += (char)(uint8_t)(BigUInt)(BASE_CHAR + card);
+            snapshot += (char)(uint8_t)(BigUInt)(BASE_CHAR + card);
 
             if (numFromDeck1 > 0)
             {
@@ -5565,10 +5565,10 @@ private:
                     break;
             }
         }
-        st += (char)(uint8_t)(BASE_CHAR);
+        snapshot += (char)(uint8_t)(BASE_CHAR);
         for (const BigInt card: deck2)
         {
-            st += (char)(uint8_t)(BigUInt)(BASE_CHAR + card);
+            snapshot += (char)(uint8_t)(BigUInt)(BASE_CHAR + card);
 
             if (numFromDeck2 > 0)
             {
