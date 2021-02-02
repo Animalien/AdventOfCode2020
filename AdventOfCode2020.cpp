@@ -5322,24 +5322,8 @@ public:
     {
         m_thisGameNumber = m_nextGameNumber++;
 
-        // check memoization
         static std::string startGameString;
         AssembleDeckString(m_player1Deck, m_player2Deck, startGameString);
-        const auto findMemoizedWinnerIter = m_memoizedWinnerMap.find(startGameString);
-        if (findMemoizedWinnerIter != m_memoizedWinnerMap.end())
-        {
-            if (pWinningPlayer)
-                *pWinningPlayer = findMemoizedWinnerIter->second;
-            if (pWinningScore)
-                *pWinningScore = 0;
-
-            if (verbose)
-                printf(
-                    "=== Game %lld ===\n\nIdentical game was won before, with winner %lld\n\n",
-                    m_thisGameNumber,
-                    findMemoizedWinnerIter->second);
-            return;
-        }
 
         m_roundDecksSet.clear();
 
@@ -5353,6 +5337,9 @@ public:
             AssembleDeckString(m_player1Deck, m_player2Deck, roundDeckString);
             if (!m_roundDecksSet.insert(roundDeckString).second)
             {
+                static BigInt count = 0;
+                ++count;
+
                 if (pWinningPlayer)
                     *pWinningPlayer = 1;
                 if (pWinningScore)
@@ -5390,23 +5377,41 @@ public:
 
             if (((BigInt)m_player1Deck.size() >= player1Plays) && ((BigInt)m_player2Deck.size() >= player2Plays))
             {
-                m_pausedGameStack.push_back(PausedGame(m_thisGameNumber, m_player1Deck, m_player2Deck, m_roundDecksSet));
-
-                if (verbose)
-                    printf("Playing a sub-game to determine the winner...\n\n");
-
                 BigInt winningPlayer = 0;
-                PlayRecursiveGame(&winningPlayer, nullptr, verbose);
 
-                PausedGame& pausedGame = m_pausedGameStack.back();
-                m_thisGameNumber = pausedGame.gameNumber;
-                m_player1Deck = pausedGame.player1Deck;
-                m_player2Deck = pausedGame.player2Deck;
-                m_roundDecksSet.swap(pausedGame.roundDecksSet);
-                m_pausedGameStack.pop_back();
+                static std::string recursiveGameString;
+                AssembleDeckString(m_player1Deck, m_player2Deck, recursiveGameString, player1Plays, player2Plays);
+                const auto findMemoizedWinnerIter = m_memoizedWinnerMap.find(recursiveGameString);
+                if (findMemoizedWinnerIter != m_memoizedWinnerMap.end())
+                {
+                    static BigInt count = 0;
+                    ++count;
 
-                if (verbose)
-                    printf("...anyway, back to game %lld.\n", m_thisGameNumber);
+                    winningPlayer = findMemoizedWinnerIter->second;
+
+                    if (verbose)
+                        printf(
+                            "Recursive game was won before, with winner %lld\n\n", winningPlayer);
+                }
+                else
+                {
+                    m_pausedGameStack.push_back(PausedGame(m_thisGameNumber, m_player1Deck, m_player2Deck, m_roundDecksSet));
+
+                    if (verbose)
+                        printf("Playing a sub-game to determine the winner...\n\n");
+
+                    PlayRecursiveGame(&winningPlayer, nullptr, verbose);
+
+                    PausedGame& pausedGame = m_pausedGameStack.back();
+                    m_thisGameNumber = pausedGame.gameNumber;
+                    m_player1Deck = pausedGame.player1Deck;
+                    m_player2Deck = pausedGame.player2Deck;
+                    m_roundDecksSet.swap(pausedGame.roundDecksSet);
+                    m_pausedGameStack.pop_back();
+
+                    if (verbose)
+                        printf("...anyway, back to game %lld.\n", m_thisGameNumber);
+                }
 
                 if (winningPlayer == 1)
                 {
@@ -5504,7 +5509,7 @@ private:
 
     typedef std::vector<PausedGame> PausedGameStack;
 
-    static void AssembleDeckString(const CrabDeck& deck1, const CrabDeck& deck2, std::string& st)
+    static void AssembleDeckString(const CrabDeck& deck1, const CrabDeck& deck2, std::string& st, BigInt numFromDeck1 = -1, BigInt numFromDeck2 = -1)
     {
         const BigInt BASE_CHAR = 32;
 
@@ -5512,11 +5517,25 @@ private:
         for (const BigInt card: deck1)
         {
             st += (char)(uint8_t)(BigUInt)(BASE_CHAR + card);
+
+            if (numFromDeck1 > 0)
+            {
+                --numFromDeck1;
+                if (numFromDeck1 <= 0)
+                    break;
+            }
         }
         st += (char)(uint8_t)(BASE_CHAR);
         for (const BigInt card: deck2)
         {
             st += (char)(uint8_t)(BigUInt)(BASE_CHAR + card);
+
+            if (numFromDeck2 > 0)
+            {
+                --numFromDeck2;
+                if (numFromDeck2 <= 0)
+                    break;
+            }
         }
     }
 
