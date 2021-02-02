@@ -5243,7 +5243,7 @@ public:
         m_thisGameNumber = 0;
         m_player1Deck = m_origPlayer1Deck;
         m_player2Deck = m_origPlayer2Deck;
-        m_roundDecksSet.clear();
+        m_roundSnapshotSet.Reset();
     }
 
     void PlayGame(BigInt& winningScore, bool verbose)
@@ -5322,10 +5322,10 @@ public:
     {
         m_thisGameNumber = m_nextGameNumber++;
 
-        static std::string startGameString;
-        AssembleDeckString(m_player1Deck, m_player2Deck, startGameString);
+        static GameSnapshot startGameSnapshot;
+        CreateGameSnapshot(m_player1Deck, m_player2Deck, startGameSnapshot);
 
-        m_roundDecksSet.clear();
+        m_roundSnapshotSet.Reset();
 
         BigInt round = 1;
         if (verbose)
@@ -5333,9 +5333,9 @@ public:
 
         while (!m_player1Deck.empty() && !m_player2Deck.empty())
         {
-            static std::string roundDeckString;
-            AssembleDeckString(m_player1Deck, m_player2Deck, roundDeckString);
-            if (!m_roundDecksSet.insert(roundDeckString).second)
+            static GameSnapshot gameSnapshot;
+            CreateGameSnapshot(m_player1Deck, m_player2Deck, gameSnapshot);
+            if (m_roundSnapshotSet.InsertQuery(gameSnapshot))
             {
                 static BigInt count = 0;
                 ++count;
@@ -5345,7 +5345,7 @@ public:
                 if (pWinningScore)
                     *pWinningScore = 0;
 
-                m_memoizedWinnerMap.insert(MemoizedWinnerMap::value_type(startGameString, 1));
+                m_winnerMap.Insert(startGameSnapshot, 1);
 
                 if (verbose)
                     printf(
@@ -5379,23 +5379,19 @@ public:
             {
                 BigInt winningPlayer = 0;
 
-                static std::string recursiveGameString;
-                AssembleDeckString(m_player1Deck, m_player2Deck, recursiveGameString, player1Plays, player2Plays);
-                const auto findMemoizedWinnerIter = m_memoizedWinnerMap.find(recursiveGameString);
-                if (findMemoizedWinnerIter != m_memoizedWinnerMap.end())
+                static GameSnapshot recursiveGameSnapshot;
+                CreateGameSnapshot(m_player1Deck, m_player2Deck, recursiveGameSnapshot, player1Plays, player2Plays);
+                if (m_winnerMap.Query(recursiveGameSnapshot, &winningPlayer))
                 {
                     static BigInt count = 0;
                     ++count;
 
-                    winningPlayer = findMemoizedWinnerIter->second;
-
                     if (verbose)
-                        printf(
-                            "Recursive game was won before, with winner %lld\n\n", winningPlayer);
+                        printf("Recursive game was won before, with winner %lld\n\n", winningPlayer);
                 }
                 else
                 {
-                    m_pausedGameStack.push_back(PausedGame(m_thisGameNumber, m_player1Deck, m_player2Deck, m_roundDecksSet));
+                    m_pausedGameStack.push_back(PausedGame(m_thisGameNumber, m_player1Deck, m_player2Deck, m_roundSnapshotSet));
 
                     if (verbose)
                         printf("Playing a sub-game to determine the winner...\n\n");
@@ -5406,7 +5402,7 @@ public:
                     m_thisGameNumber = pausedGame.gameNumber;
                     m_player1Deck = pausedGame.player1Deck;
                     m_player2Deck = pausedGame.player2Deck;
-                    m_roundDecksSet.swap(pausedGame.roundDecksSet);
+                    m_roundSnapshotSet.Swap(pausedGame.roundSnapshotSet);
                     m_pausedGameStack.pop_back();
 
                     if (verbose)
@@ -5478,7 +5474,7 @@ public:
             *pWinningPlayer = winningPlayer;
         if (pWinningScore)
             *pWinningScore = CalcWinningScore(m_player2Deck.empty() ? m_player1Deck : m_player2Deck);
-        m_memoizedWinnerMap.insert(MemoizedWinnerMap::value_type(startGameString, winningPlayer));
+        m_winnerMap.Insert(startGameSnapshot, winningPlayer);
     }
 
     BigInt CalcWinningPlayerScore() const
@@ -5492,24 +5488,68 @@ public:
 private:
     typedef CircularBuffer<BigInt, 6> CrabDeck;
 
-    typedef UnorderedStringSet RoundDecksSet;
+    typedef std::string GameSnapshot;
+
+    class RoundSnapshotSet
+    {
+    public:
+        RoundSnapshotSet() : m_set() {}
+
+        void Reset() { m_set.clear(); }
+        void Swap(RoundSnapshotSet& rhs) { m_set.swap(rhs.m_set); }
+
+        // attempt to insert in set, and return whether snapshot was already in the set originally
+        bool InsertQuery(const GameSnapshot& snapshot) { return !m_set.insert(snapshot).second; }
+
+
+    private:
+        UnorderedStringSet m_set;
+    };
+
+    class GameWinnerMap
+    {
+    public:
+        GameWinnerMap() : m_map() {}
+
+        bool Query(const GameSnapshot& snapshot, BigInt* pWinner = nullptr) const
+        {
+            const auto findWinnerIter = m_map.find(snapshot);
+            if (findWinnerIter != m_map.end())
+            {
+                if (pWinner)
+                    *pWinner = findWinnerIter->second;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        void Insert(const GameSnapshot& snapshot, BigInt winner) { m_map.insert(WinnerMap::value_type(snapshot, winner)); }
+
+    private:
+        typedef std::unordered_map<GameSnapshot, BigInt> WinnerMap;
+        WinnerMap m_map;
+    };
 
     struct PausedGame
     {
         BigInt gameNumber;
         CrabDeck player1Deck;
         CrabDeck player2Deck;
-        RoundDecksSet roundDecksSet;
+        RoundSnapshotSet roundSnapshotSet;
 
-        PausedGame(BigInt gn, const CrabDeck& p1D, const CrabDeck& p2D, const RoundDecksSet& rds)
-            : gameNumber(gn), player1Deck(p1D), player2Deck(p2D), roundDecksSet(rds)
+        PausedGame(BigInt gn, const CrabDeck& p1D, const CrabDeck& p2D, const RoundSnapshotSet& rsss)
+            : gameNumber(gn), player1Deck(p1D), player2Deck(p2D), roundSnapshotSet(rsss)
         {
         }
     };
 
     typedef std::vector<PausedGame> PausedGameStack;
 
-    static void AssembleDeckString(const CrabDeck& deck1, const CrabDeck& deck2, std::string& st, BigInt numFromDeck1 = -1, BigInt numFromDeck2 = -1)
+    static void CreateGameSnapshot(
+        const CrabDeck& deck1, const CrabDeck& deck2, std::string& st, BigInt numFromDeck1 = -1, BigInt numFromDeck2 = -1)
     {
         const BigInt BASE_CHAR = 32;
 
@@ -5555,21 +5595,19 @@ private:
         return score;
     }
 
-    typedef std::unordered_map<std::string, BigInt> MemoizedWinnerMap;
-
     BigInt m_nextGameNumber;
 
     BigInt m_thisGameNumber;
     CrabDeck m_player1Deck;
     CrabDeck m_player2Deck;
-    RoundDecksSet m_roundDecksSet;
+    RoundSnapshotSet m_roundSnapshotSet;
 
     PausedGameStack m_pausedGameStack;
 
     CrabDeck m_origPlayer1Deck;
     CrabDeck m_origPlayer2Deck;
 
-    MemoizedWinnerMap m_memoizedWinnerMap;
+    GameWinnerMap m_winnerMap;
 };
 
 void RunCrabCombat()
